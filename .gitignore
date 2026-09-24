@@ -1,0 +1,43 @@
+# Python 虚拟环境与缓存
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# 媒体与临时缓存数据 (不入版本库)
+storage/uploads/*
+storage/audio/*
+storage/clips/*
+storage/outputs/*
+!storage/uploads/.gitkeep
+!storage/audio/.gitkeep
+!storage/clips/.gitkeep
+!storage/outputs/.gitkeep
+
+# 系统与 IDE 配置文件
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
