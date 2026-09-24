@@ -159,14 +159,19 @@ class ImpactDetector:
                 target_score = ai_res.get("target_score", 0.0) # Slap/Whip 命中分
                 is_pure_noise = ai_res.get("is_pure_noise", False)
 
-                # 智能初筛过滤：
-                # 1. 如果经 YAMNet 判定为纯人声/尖叫/哭喊/敲门/脚步/掌声，且完全无 Slap/Whip 拍打特征，则一票否决剔除！
+                # 智能初筛与微调模型过滤：
+                # 1. 纯噪音一票否决：如果经 YAMNet 判定为纯人声/尖叫/哭喊/敲门/脚步/掌声，且完全无 Slap/Whip 拍打特征，则剔除
                 if is_pure_noise:
                     continue
 
-                # 2. 如果存在拍打特征（哪怕是拍打 + 人声/呻吟/叫声/背景音乐混合），均予以坚定保留！
-                # 融合 AI 预测分值：若 AI 命中 Slap/Whip，将大幅提升其置信度
-                blended_confidence = float(np.clip(ev["confidence"] * 0.5 + target_score * 0.5 + 0.1, 0.2, 0.99))
+                # 2. 本地微调模型门禁过滤：
+                # 如果用户已经通过人工反馈微调了专属模型，且专属模型给该片段打出的拍打概率极低（< 0.25），说明这是用户曾经手动删除/舍弃过的类似噪音，直接过滤！
+                custom_score = ai_res.get("custom_score")
+                if custom_score is not None and custom_score < 0.25:
+                    continue
+
+                # 3. 融合 AI 预测分值：若 AI 命中 Slap/Whip 或本地微调高分，将大幅提升其置信度
+                blended_confidence = float(np.clip(ev["confidence"] * 0.4 + target_score * 0.6 + 0.05, 0.2, 0.99))
 
                 # 保存用于人工反馈学习的特征索引（转为可序列化的 list）
                 embedding_data = ai_res.get("embedding")
@@ -176,7 +181,7 @@ class ImpactDetector:
                     "time": ev["time"],
                     "confidence": round(blended_confidence, 2),
                     "ai_score": round(target_score, 2),
-                    "custom_score": ai_res.get("custom_score"),
+                    "custom_score": custom_score,
                     "ai_label": ai_res.get("top1_label", ""),
                     "rms_db": ev["rms_db"],
                     "spectral_centroid": ev["spectral_centroid"],

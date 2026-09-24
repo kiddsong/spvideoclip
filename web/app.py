@@ -255,6 +255,13 @@ async def train_custom_head():
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
+@app.post("/api/tuner/clear")
+async def clear_feedback_samples():
+    """清空历史积累的反馈样本库"""
+    tuner = pipeline.detector.yamnet.tuner
+    stats = tuner.clear_samples()
+    return {"status": "success", "stats": stats, "message": "已清空历史样本库"}
+
 @app.get("/api/preview-status/{filename}")
 async def check_preview_status(filename: str):
     """检查后台轻量预览流文件是否已转码完成"""

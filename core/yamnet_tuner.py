@@ -114,8 +114,17 @@ class YAMNetTuner:
             "pos_count": pos_count,
             "neg_count": neg_count,
             "train_accuracy": round(acc, 3),
-            "message": f"微调训练完成！基于 {len(y)} 个专属样本优化（准确度: {round(acc*100, 1)}%）"
+            "message": f"微调训练成功！专属模型已就绪（当前基于 {len(y)} 个历史样本，拟合准确度: {round(acc*100, 1)}%）"
         }
+
+    def clear_samples(self) -> Dict[str, Any]:
+        """清空历史反馈样本库（保留微调模型权重）"""
+        if os.path.exists(self.samples_file):
+            try:
+                os.remove(self.samples_file)
+            except Exception:
+                pass
+        return self.get_stats()
 
     def predict_score(self, embedding: np.ndarray) -> Optional[float]:
         """利用微调后的模型对单个 1024 维特征预测其属于拍打的概率 (0.0 ~ 1.0)"""
