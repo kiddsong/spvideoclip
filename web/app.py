@@ -2,6 +2,7 @@ import os
 import uuid
 import asyncio
 import json
+import numpy as np
 from typing import Dict, Any, List, Optional
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException, BackgroundTasks
 from fastapi.responses import HTMLResponse, FileResponse, StreamingResponse, JSONResponse
