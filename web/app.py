@@ -264,11 +264,18 @@ async def clear_feedback_samples():
 
 @app.get("/api/preview-status/{filename}")
 async def check_preview_status(filename: str):
-    """检查后台轻量预览流文件是否已转码完成"""
+    """检查后台轻量预览流文件的转码进度与就绪状态"""
+    info = pipeline.transcode_progress.get(filename, {})
     preview_path = os.path.join(pipeline.upload_dir, filename)
-    if os.path.exists(preview_path) and os.path.getsize(preview_path) > 1024:
-        return {"ready": True, "url": f"/api/media/uploads/{filename}"}
-    return {"ready": False}
+
+    is_file_ready = os.path.exists(preview_path) and os.path.getsize(preview_path) > 1024 and info.get("ready", False)
+
+    return {
+        "ready": is_file_ready,
+        "progress": info.get("progress", 1.0 if is_file_ready else 0.0),
+        "message": info.get("message", "正在转换中..."),
+        "url": f"/api/media/uploads/{filename}" if is_file_ready else None
+    }
 
 @app.post("/api/select-local")
 async def select_local_file(path: Optional[str] = Form(None)):

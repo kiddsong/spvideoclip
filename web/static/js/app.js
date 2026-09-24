@@ -43,6 +43,9 @@ window.addEventListener("DOMContentLoaded", () => {
     const playerOriginal = document.getElementById("player-original");
     const playerContainer = document.getElementById("player-container");
     const transcodingOverlay = document.getElementById("transcoding-overlay");
+    const transcodePercent = document.getElementById("transcode-percent");
+    const transcodeProgressBar = document.getElementById("transcode-progress-bar");
+    const transcodeMsg = document.getElementById("transcode-msg");
     const playbackStatusBadge = document.getElementById("playback-status-badge");
     const infoConvertedText = document.getElementById("info-converted-text");
     const playerTip = document.getElementById("player-tip");
@@ -243,18 +246,34 @@ window.addEventListener("DOMContentLoaded", () => {
         hideProgress();
     }
 
-    // 轮询预览流是否转码就绪
+    // 轮询预览流是否转码就绪并更新精确百分比进度
     function pollPreviewReady(previewFilename) {
         let count = 0;
         const timer = setInterval(async () => {
             count++;
-            if (count > 90) { // 最多轮询 180 秒
+            if (count > 200) { // 最多轮询 300 秒
                 clearInterval(timer);
                 return;
             }
             try {
                 const resp = await fetch(`/api/preview-status/${encodeURIComponent(previewFilename)}`);
                 const res = await resp.json();
+
+                // 实时更新浮层和参数栏的百分比进度
+                const percent = Math.round((res.progress || 0) * 100);
+                if (transcodePercent) {
+                    transcodePercent.innerText = `${percent}%`;
+                }
+                if (transcodeProgressBar) {
+                    transcodeProgressBar.style.width = `${percent}%`;
+                }
+                if (transcodeMsg && res.message) {
+                    transcodeMsg.innerText = res.message;
+                }
+                if (playbackStatusBadge && !res.ready) {
+                    playbackStatusBadge.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse"></span><span>正在转换 H5 流 (${percent}%)...</span>`;
+                }
+
                 if (res.ready) {
                     clearInterval(timer);
                     if (playerOriginal) {
@@ -279,7 +298,7 @@ window.addEventListener("DOMContentLoaded", () => {
                     }
                 }
             } catch (e) {}
-        }, 1500);
+        }, 1000);
     }
 
     // 处理传统文件上传 (复用统一的 applyLoadedVideo 渲染)

@@ -1,7 +1,7 @@
 import os
 import subprocess
 import json
-from typing import Tuple, Dict, Any
+from typing import Tuple, Dict, Any, Callable, Optional
 
 SUPPORTED_EXTENSIONS = {
     # 现代标准格式
@@ -23,7 +23,7 @@ SUPPORTED_EXTENSIONS = {
 }
 
 class AudioExtractor:
-    """负责通过 FFmpeg 探测视频、提取高品质分析音频，以及为古老视频格式生成 H5 兼容预览流"""
+    """负责通过 FFmpeg 探测视频、提取高品质分析音频，以及为古老视频格式生成带精准进度的 H5 预览流"""
 
     def __init__(self, sample_rate: int = 22050):
         self.sample_rate = sample_rate
@@ -69,19 +69,25 @@ class AudioExtractor:
     def is_browser_native(self, video_path: str, info: Dict[str, Any]) -> bool:
         """判断视频是否能被 Chrome/Edge/Firefox 的 H5 <video> 标签原生直接流畅播放"""
         ext = os.path.splitext(video_path)[1].lower()
-        # 仅当格式为 mp4 且视频编码为 h264/avc1，音频为 aac/mp3 时，大部分现代浏览器才能无缝原生播放
         if ext == ".mp4" and info.get("v_codec") in ["h264", "avc1"]:
             return True
         if ext == ".webm" and info.get("v_codec") in ["vp8", "vp9", "av1"]:
             return True
         return False
 
-    def convert_to_web_preview(self, input_path: str, output_mp4_path: str) -> str:
+    def convert_to_web_preview(
+        self,
+        input_path: str,
+        output_mp4_path: str,
+        total_duration: float = 0.0,
+        progress_callback: Optional[Callable[[float, str], None]] = None
+    ) -> str:
         """
-        将古老格式（rm, rmvb, wmv, mpg, vob 等）或不兼容编码转为 H5 友好且适合随时 Seek 的 Web MP4
-        采用超快速度 ultrafast 预设，确保上传后极速完成
+        将古老格式或不兼容编码转为 H5 友好 Web MP4，并实时解析 FFmpeg 管道向外部推送百分比进度
         """
         os.makedirs(os.path.dirname(output_mp4_path), exist_ok=True)
+        temp_output = output_mp4_path + ".tmp.mp4"
+
         cmd = [
             "ffmpeg",
             "-y",
@@ -93,12 +99,53 @@ class AudioExtractor:
             "-c:a", "aac",
             "-b:a", "128k",
             "-movflags", "+faststart",
-            output_mp4_path
+            "-progress", "pipe:1",
+            "-nostats",
+            temp_output
         ]
-        res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-        if res.returncode != 0:
-            raise RuntimeError(f"转码 Web 兼容预览流失败: {res.stderr}")
-        return output_mp4_path
+
+        try:
+            proc = subprocess.Popen(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.DEVNULL,
+                text=True,
+                bufsize=1
+            )
+
+            for line in proc.stdout:
+                line = line.strip()
+                if line.startswith("out_time_ms=") and total_duration > 0:
+                    try:
+                        ms = int(line.split("=")[1])
+                        current_sec = ms / 1_000_000.0
+                        ratio = min(0.99, max(0.01, current_sec / total_duration))
+                        percent = int(ratio * 100)
+                        if progress_callback:
+                            progress_callback(ratio, f"正在转换 H5 预览画面: {percent}% ({current_sec:.1f}s / {total_duration:.1f}s)")
+                    except Exception:
+                        pass
+                elif line.startswith("progress=end"):
+                    if progress_callback:
+                        progress_callback(1.0, "H5 预览流转码完成！")
+
+            proc.wait()
+            if proc.returncode != 0:
+                raise RuntimeError(f"FFmpeg 转码异常退出，退出码: {proc.returncode}")
+
+            if os.path.exists(temp_output):
+                if os.path.exists(output_mp4_path):
+                    os.remove(output_mp4_path)
+                os.rename(temp_output, output_mp4_path)
+
+            return output_mp4_path
+
+        finally:
+            if os.path.exists(temp_output):
+                try:
+                    os.remove(temp_output)
+                except Exception:
+                    pass
 
     def extract_audio(self, video_path: str, output_wav_path: str) -> str:
         """从视频（无论新旧格式）提取单声道分析用高保真 WAV"""

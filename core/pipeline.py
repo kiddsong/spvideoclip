@@ -25,6 +25,9 @@ class VideoPipeline:
         self.detector = ImpactDetector(sample_rate=22050)
         self.cutter = VideoCutter()
 
+        # 记录各文件的转码进度与状态
+        self.transcode_progress: Dict[str, Dict[str, Any]] = {}
+
     def _resolve_video_path(self, video_identifier: str) -> str:
         """解析视频路径：支持绝对路径（直接读取）和 uploads 内部相对路径"""
         if os.path.isabs(video_identifier) and os.path.exists(video_identifier):
@@ -61,6 +64,11 @@ class VideoPipeline:
         # 检查是否已存在可用的预览文件
         if os.path.exists(preview_path) and os.path.getsize(preview_path) > 0:
             playback_url = f"/api/media/uploads/{preview_filename}"
+            self.transcode_progress[preview_filename] = {
+                "progress": 1.0,
+                "message": "H5 预览流已就绪",
+                "ready": True
+            }
         elif is_native:
             # 浏览器原生兼容格式，优先使用 direct 流
             if os.path.isabs(video_identifier):
@@ -70,13 +78,39 @@ class VideoPipeline:
                 playback_url = f"/api/media/uploads/{video_identifier}"
         else:
             # 非浏览器原生格式 (wmv, rmvb, avi, mkv, h265 等)：
-            # 必须后台异步生成专供网页播放的轻量预览流
+            # 必须后台异步生成专供网页播放的轻量预览流并实时追踪进度
+            self.transcode_progress[preview_filename] = {
+                "progress": 0.01,
+                "message": "正在启动转码转换...",
+                "ready": False
+            }
+
             import threading
             def async_convert():
                 try:
-                    self.audio_extractor.convert_to_web_preview(video_path, preview_path)
-                except Exception:
-                    pass
+                    def on_progress(ratio, msg):
+                        self.transcode_progress[preview_filename] = {
+                            "progress": round(ratio, 2),
+                            "message": msg,
+                            "ready": False
+                        }
+                    self.audio_extractor.convert_to_web_preview(
+                        input_path=video_path,
+                        output_mp4_path=preview_path,
+                        total_duration=video_info.get("duration", 0.0),
+                        progress_callback=on_progress
+                    )
+                    self.transcode_progress[preview_filename] = {
+                        "progress": 1.0,
+                        "message": "H5 预览转换完成！",
+                        "ready": True
+                    }
+                except Exception as e:
+                    self.transcode_progress[preview_filename] = {
+                        "progress": 0.0,
+                        "message": f"转码异常: {str(e)}",
+                        "ready": False
+                    }
             threading.Thread(target=async_convert, daemon=True).start()
 
             # 当预览流还没就绪时，先尝试直读（若部分支持），同时前端会自动轮询预览流

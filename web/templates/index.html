@@ -173,14 +173,20 @@
                 <div id="player-container" class="bg-black rounded-xl overflow-hidden aspect-video flex items-center justify-center border border-slate-800 hidden relative">
                     <video id="player-original" controls class="w-full h-full object-contain"></video>
 
-                    <!-- 转码中的覆盖状态浮层 (仅在不兼容格式后台转码时浮现提示) -->
-                    <div id="transcoding-overlay" class="absolute inset-0 bg-slate-950/85 backdrop-blur-sm flex flex-col items-center justify-center text-center p-6 gap-3 hidden z-10">
+                    <!-- 转码中的覆盖状态浮层 (包含动态百分比与进度条) -->
+                    <div id="transcoding-overlay" class="absolute inset-0 bg-slate-950/85 backdrop-blur-sm flex flex-col items-center justify-center text-center p-6 gap-3.5 hidden z-10">
                         <div class="w-10 h-10 border-3 border-amber-500/30 border-t-amber-500 rounded-full animate-spin"></div>
-                        <div>
-                            <div class="text-xs font-semibold text-amber-300 flex items-center justify-center gap-1.5">
-                                <span>检测到非网页原生编码，正在极速转换 H5 预览画面...</span>
+                        <div class="w-full max-w-xs space-y-2">
+                            <div class="flex items-center justify-between text-xs">
+                                <span class="font-semibold text-amber-300">正在生成 H5 预览画面...</span>
+                                <span id="transcode-percent" class="font-mono text-amber-400 font-bold">0%</span>
                             </div>
-                            <p class="text-[11px] text-slate-400 mt-1 max-w-xs">
+                            <!-- 进度条 -->
+                            <div class="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
+                                <div id="transcode-progress-bar" class="bg-gradient-to-r from-amber-500 to-rose-500 h-full w-0 transition-all duration-300"></div>
+                            </div>
+                            <p id="transcode-msg" class="text-[10px] text-slate-400 font-mono">正在启动 FFmpeg 硬件加速转码...</p>
+                            <p class="text-[11px] text-slate-400 pt-1 border-t border-slate-800/80">
                                 提示：拍打声识别已就绪，您现在即可点击右上角<b>【开始识别】</b>，无需等待画面转码！
                             </p>
                         </div>
@@ -292,6 +298,6 @@
     </footer>
 
     <!-- 业务逻辑脚本 (加版本号避免浏览器304旧缓存) -->
-    <script src="/static/js/app.js?v=13.0"></script>
+    <script src="/static/js/app.js?v=14.0"></script>
 </body>
 </html>
