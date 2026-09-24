@@ -31,6 +31,8 @@ window.addEventListener("DOMContentLoaded", () => {
     const labelAi = document.getElementById("label-ai");
 
     const btnAnalyze = document.getElementById("btn-analyze");
+    const btnTuneModel = document.getElementById("btn-tune-model");
+    const badgeTunerSamples = document.getElementById("badge-tuner-samples");
     const btnClearStorage = document.getElementById("btn-clear-storage");
     const btnRenderVideo = document.getElementById("btn-render-video");
     const progressBox = document.getElementById("progress-box");
@@ -447,11 +449,50 @@ window.addEventListener("DOMContentLoaded", () => {
         });
     }
 
-    // 切换锁定状态
+    // 初始拉取一次微调样本统计
+    refreshTunerStats();
+
+    async function refreshTunerStats() {
+        try {
+            const resp = await fetch("/api/tuner/stats");
+            const data = await resp.json();
+            if (badgeTunerSamples) {
+                badgeTunerSamples.innerText = `${data.pos_count}+/${data.neg_count}-`;
+                if (data.is_tuned) {
+                    badgeTunerSamples.title = `微调模型已加载！(已积累 正样本:${data.pos_count}, 负样本:${data.neg_count})`;
+                } else {
+                    badgeTunerSamples.title = `尚未微调 (已积累 正样本:${data.pos_count}, 负样本:${data.neg_count}，至少各需2个样本)`;
+                }
+            }
+        } catch (e) {}
+    }
+
+    // 发送用户反馈至后端样本库
+    async function submitFeedback(items) {
+        if (!items || items.length === 0) return;
+        try {
+            await fetch("/api/tuner/feedback", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ items: items })
+            });
+            refreshTunerStats();
+        } catch (e) {}
+    }
+
+    // 切换锁定状态 (锁定视为用户确认的正样本 1)
     window.toggleLock = function(index) {
         if (!state.events[index]) return;
         state.events[index].locked = !state.events[index].locked;
         renderEventsList();
+
+        // 当用户主动加锁时，自动采集为【正样本】
+        if (state.events[index].locked && state.events[index].embedding) {
+            submitFeedback([{
+                embedding: state.events[index].embedding,
+                label: 1
+            }]);
+        }
     };
 
     // 全局跳跃时间函数 (暴露给行内 onclick)
@@ -461,19 +502,29 @@ window.addEventListener("DOMContentLoaded", () => {
         playerOriginal.play();
     };
 
-    // 移除单项并动态重新计算合并区间 (防误删：被锁定的片段拒绝删除)
+    // 移除单项并动态重新计算合并区间 (防误删：被锁定的片段拒绝删除；删除视为【负样本】采集)
     window.removeEvent = function(index) {
         if (!state.events[index]) return;
         if (state.events[index].locked) {
             alert("该片段已被锁定保护，无法删除！如需删除请先点击锁图标解锁。");
             return;
         }
+
+        const removed = state.events[index];
+        // 自动将用户剔除的片段作为【负样本】采集学习
+        if (removed && removed.embedding) {
+            submitFeedback([{
+                embedding: removed.embedding,
+                label: 0
+            }]);
+        }
+
         state.events.splice(index, 1);
         recalcIntervals();
         renderEventsList();
     };
 
-    // 批量舍弃：舍弃当前时间点之前的所有未锁定片段
+    // 批量舍弃：舍弃当前时间点之前的所有未锁定片段 (自动批量采集为负样本)
     if (btnDiscardBefore) {
         btnDiscardBefore.addEventListener("click", () => {
             if (!playerOriginal || state.events.length === 0) return;
@@ -488,13 +539,20 @@ window.addEventListener("DOMContentLoaded", () => {
             const confirmed = confirm(`确定要舍弃 ${formatTime(curTime)} 之前的所有未锁定片段吗？\n共将移除 ${toRemove.length} 个片段。已锁定的片段将保留。`);
             if (!confirmed) return;
 
+            // 批量将剔除的片段作为负样本收集
+            const negItems = toRemove.filter(it => it.embedding).map(it => ({
+                embedding: it.embedding,
+                label: 0
+            }));
+            submitFeedback(negItems);
+
             state.events = state.events.filter(ev => ev.time >= curTime || ev.locked);
             recalcIntervals();
             renderEventsList();
         });
     }
 
-    // 批量舍弃：舍弃当前时间点之后的所有未锁定片段
+    // 批量舍弃：舍弃当前时间点之后的所有未锁定片段 (自动批量采集为负样本)
     if (btnDiscardAfter) {
         btnDiscardAfter.addEventListener("click", () => {
             if (!playerOriginal || state.events.length === 0) return;
@@ -508,6 +566,13 @@ window.addEventListener("DOMContentLoaded", () => {
 
             const confirmed = confirm(`确定要舍弃 ${formatTime(curTime)} 之后的所有未锁定片段吗？\n共将移除 ${toRemove.length} 个片段。已锁定的片段将保留。`);
             if (!confirmed) return;
+
+            // 批量将剔除的片段作为负样本收集
+            const negItems = toRemove.filter(it => it.embedding).map(it => ({
+                embedding: it.embedding,
+                label: 0
+            }));
+            submitFeedback(negItems);
 
             state.events = state.events.filter(ev => ev.time <= curTime || ev.locked);
             recalcIntervals();
@@ -545,10 +610,17 @@ window.addEventListener("DOMContentLoaded", () => {
         if (btnRenderVideo) btnRenderVideo.disabled = (state.intervals.length === 0);
     }
 
-    // 点击“合并并保存”
+    // 点击“合并并保存” (自动将最终保留的片段作为【正样本】学习巩固)
     if (btnRenderVideo) {
         btnRenderVideo.addEventListener("click", async () => {
             if (!state.uploadedFile || state.intervals.length === 0) return;
+
+            // 自动把用户最终认可并合成的所有片段作为【正样本】收集
+            const posItems = state.events.filter(it => it.embedding).map(it => ({
+                embedding: it.embedding,
+                label: 1
+            }));
+            submitFeedback(posItems);
 
             btnRenderVideo.disabled = true;
             showProgress("正在裁剪并合并视频片段...", 5);
@@ -639,6 +711,40 @@ window.addEventListener("DOMContentLoaded", () => {
                 renderEventsList();
             } catch (err) {
                 alert("清理失败: " + err.message);
+            }
+        });
+    }
+
+    // 点击“微调训练”按钮
+    if (btnTuneModel) {
+        btnTuneModel.addEventListener("click", async () => {
+            btnTuneModel.disabled = true;
+            try {
+                const statResp = await fetch("/api/tuner/stats");
+                const stats = await statResp.json();
+
+                if (!stats.can_tune) {
+                    alert(`目前收集的有效样本尚不足：\n当前已收集 正样本: ${stats.pos_count} 个, 负样本: ${stats.neg_count} 个。\n\n提示：\n- 当您点击【加锁】或最终【合并保存】时，片段会自动作为正样本记录；\n- 当您点击【红叉删除】或【批量舍弃】时，片段会自动作为负样本记录。\n正负样本各至少达到 2 个即可开启微调训练！`);
+                    btnTuneModel.disabled = false;
+                    return;
+                }
+
+                showProgress("正在基于人工反馈微调 YAMNet 专属分类头...", 50);
+
+                const resp = await fetch("/api/tuner/train", { method: "POST" });
+                const res = await resp.json();
+                if (!resp.ok) {
+                    throw new Error(res.detail || "训练失败");
+                }
+
+                hideProgress();
+                alert(res.message);
+                refreshTunerStats();
+            } catch (err) {
+                hideProgress();
+                alert("微调失败: " + err.message);
+            } finally {
+                btnTuneModel.disabled = false;
             }
         });
     }

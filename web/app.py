@@ -38,6 +38,13 @@ class RenderRequest(BaseModel):
     intervals: List[List[float]]
     original_name: Optional[str] = None
 
+class FeedbackItem(BaseModel):
+    embedding: List[float]
+    label: int # 1 为正样本(确实是拍打)，0 为负样本(噪音误报)
+
+class FeedbackBatchRequest(BaseModel):
+    items: List[FeedbackItem]
+
 @app.get("/", response_class=HTMLResponse)
 async def index():
     html_path = os.path.join(BASE_DIR, "web", "templates", "index.html")
@@ -222,6 +229,30 @@ async def clear_temp_storage():
         "freed_mb": freed_mb,
         "message": f"成功清理 {deleted_count} 个临时文件，释放约 {freed_mb} MB 磁盘空间！"
     }
+
+@app.get("/api/tuner/stats")
+async def get_tuner_stats():
+    """获取当前人工反馈样本收集情况与微调状态"""
+    return pipeline.detector.yamnet.tuner.get_stats()
+
+@app.post("/api/tuner/feedback")
+async def record_user_feedback(req: FeedbackBatchRequest):
+    """接收前端提交的正负样本反馈并持久化存储"""
+    tuner = pipeline.detector.yamnet.tuner
+    embeddings = [np.array(it.embedding, dtype=np.float32) for it in req.items if it.embedding]
+    labels = [it.label for it in req.items if it.embedding]
+    stats = tuner.record_feedback(embeddings, labels)
+    return {"status": "success", "stats": stats}
+
+@app.post("/api/tuner/train")
+async def train_custom_head():
+    """触发本地一键微调训练，更新专属模型权重"""
+    tuner = pipeline.detector.yamnet.tuner
+    try:
+        res = tuner.train()
+        return res
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 @app.get("/api/preview-status/{filename}")
 async def check_preview_status(filename: str):

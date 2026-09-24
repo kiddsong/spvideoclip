@@ -168,13 +168,19 @@ class ImpactDetector:
                 # 融合 AI 预测分值：若 AI 命中 Slap/Whip，将大幅提升其置信度
                 blended_confidence = float(np.clip(ev["confidence"] * 0.5 + target_score * 0.5 + 0.1, 0.2, 0.99))
 
+                # 保存用于人工反馈学习的特征索引（转为可序列化的 list）
+                embedding_data = ai_res.get("embedding")
+                embedding_list = [round(float(v), 5) for v in embedding_data] if embedding_data is not None else None
+
                 final_events.append({
                     "time": ev["time"],
                     "confidence": round(blended_confidence, 2),
                     "ai_score": round(target_score, 2),
+                    "custom_score": ai_res.get("custom_score"),
                     "ai_label": ai_res.get("top1_label", ""),
                     "rms_db": ev["rms_db"],
-                    "spectral_centroid": ev["spectral_centroid"]
+                    "spectral_centroid": ev["spectral_centroid"],
+                    "embedding": embedding_list
                 })
         else:
             # 纯声学模式
@@ -183,8 +189,10 @@ class ImpactDetector:
                     "time": ev["time"],
                     "confidence": ev["confidence"],
                     "ai_score": None,
+                    "custom_score": None,
                     "rms_db": ev["rms_db"],
-                    "spectral_centroid": ev["spectral_centroid"]
+                    "spectral_centroid": ev["spectral_centroid"],
+                    "embedding": None
                 })
 
         return final_events

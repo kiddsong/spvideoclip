@@ -3,21 +3,12 @@ import csv
 import numpy as np
 import librosa
 from typing import List, Dict, Any, Optional
+from core.yamnet_tuner import YAMNetTuner
 
 class YAMNetClassifier:
     """
-    基于 Google AudioSet 预训练 YAMNet 深度神经网络的拍打/抽打声音事件分类器。
-
-    重点检测类别（Target Slap & Impact Features）：
-      - 461: Slap, smack (肉体拍打/掌掴/脆击)
-      - 466: Whip (皮鞭抽打/破空甩动声)
-      - 352: Slam (重击撞击包络)
-      - 462: Click (短促冲击爆裂音)
-
-    纯干扰排查类别（Interference Categories，若只有这些声音而无任何拍打迹象，则一票否决剔除）：
-      - 纯人声/呼喊: 0 (Speech), 6 (Shout), 9 (Yell), 10 (Children shouting), 11 (Screaming), 13 (Laughter), 19 (Crying, sobbing), 33 (Groan), 34 (Grunt)
-      - 环境机械碰撞: 348 (Door), 351 (Sliding door), 353 (Knock), 58 (Clapping), 62 (Applause)
-      - 脚步与地面: 48 (Walk, footsteps)
+    基于 Google AudioSet 预训练 YAMNet 深度神经网络的拍打/抽打声音事件分类器，
+    并挂载本地专属 RLHF 人工反馈微调头（YAMNetTuner）。
     """
 
     def __init__(self, model_path: Optional[str] = None):
@@ -35,7 +26,7 @@ class YAMNetClassifier:
             466: "Whip"
         }
 
-        # 强干扰误报类别（无拍打伴随时直接剔除）
+        # 强干扰误报类别（无拍打伴运行时直接剔除）
         self.pure_interference_indices = {
             0, 1, 5, 6, 9, 10, 11, 13, 14, 15, 19, 23, 33, 34, 65, # 人声/尖叫/哭泣/喘息
             48,                                                   # 脚步/地面声
@@ -43,6 +34,7 @@ class YAMNetClassifier:
             58, 62                                                # 单纯拍手/鼓掌
         }
 
+        self.tuner = YAMNetTuner()
         self._load_classes()
         self._init_session()
 
@@ -71,14 +63,14 @@ class YAMNetClassifier:
 
     def evaluate_clip(self, y_16k: np.ndarray) -> Dict[str, Any]:
         """
-        对输入的 16kHz 音频切片进行 YAMNet 深度语义推断。
+        对输入的 16kHz 音频切片进行 YAMNet 深度语义推断，并由本地微调模型联合修正。
         返回：
-          - target_score: 拍打/抽打（Slap / Whip）的综合置信分 (0.0 ~ 1.0)
-          - is_pure_noise: 是否为纯粹的尖叫/哭喊/敲门/脚步等无拍打噪音 (True 表示应舍弃)
-          - top1_label: Top-1 预测标签
+          - target_score: 融合了 Google 原始分与本地微调权重的综合判定分
+          - embedding: 1024 维特征向量（供人工反馈学习）
+          - is_pure_noise: 是否为纯噪音（应舍弃）
         """
         if not self.is_available() or len(y_16k) < 1600:
-            return {"target_score": 0.5, "is_pure_noise": False, "top1_label": "unknown"}
+            return {"target_score": 0.5, "is_pure_noise": False, "top1_label": "unknown", "embedding": None}
 
         waveform = np.asarray(y_16k, dtype=np.float32)
         max_val = np.max(np.abs(waveform))
@@ -88,41 +80,52 @@ class YAMNetClassifier:
         try:
             input_name = self.session.get_inputs()[0].name
             outputs = self.session.run(None, {input_name: waveform})
-            scores = outputs[0] # [num_frames, 521]
+            scores = outputs[0]      # [num_frames, 521]
+            embeddings = outputs[1]  # [num_frames, 1024]
 
             if len(scores) == 0:
-                return {"target_score": 0.5, "is_pure_noise": False, "top1_label": "unknown"}
+                return {"target_score": 0.5, "is_pure_noise": False, "top1_label": "unknown", "embedding": None}
 
             max_scores_per_class = np.max(scores, axis=0)
+            # 取整段切片中能量最强帧的 1024 维 Embedding，用于本地微调特征库
+            mean_embedding = np.mean(embeddings, axis=0) # [1024]
 
-            # 1. 核心目标：Slap (461) 与 Whip (466)
+            # 1. Google 原始分类分值
             slap_score = float(max_scores_per_class[461]) if 461 < len(max_scores_per_class) else 0.0
             whip_score = float(max_scores_per_class[466]) if 466 < len(max_scores_per_class) else 0.0
-            target_score = max(slap_score, whip_score)
+            raw_target_score = max(slap_score, whip_score)
 
-            # 2. 统计强干扰类别得分
+            # 2. 本地微调模型预测分（如果用户已经微调过）
+            custom_score = self.tuner.predict_score(mean_embedding)
+
+            # 3. 融合分计算：若已有本地微调模型，赋予本地模型 60% 决策权，大幅纠偏 Google 通用模型的偏差！
+            if custom_score is not None:
+                final_target_score = round(0.4 * raw_target_score + 0.6 * custom_score, 3)
+            else:
+                final_target_score = round(raw_target_score, 3)
+
+            # 4. 统计强干扰类别得分
             top1_idx = int(np.argmax(max_scores_per_class))
             top1_label = self.classes.get(top1_idx, f"Class {top1_idx}")
             top1_score = float(max_scores_per_class[top1_idx])
 
-            # 检查是否有非拍打噪音极高而拍打分极低的情况
-            # 规则：如果 Top-1 是纯人声(哭叫/言语)或关门/脚步，且 target_score 极低(<0.05)，则标记为纯噪音
             is_pure_noise = False
-            if top1_idx in self.pure_interference_indices and target_score < 0.04:
+            # 只有当本地模型和原始模型均判定不是拍打时，才触发一票否决
+            if top1_idx in self.pure_interference_indices and final_target_score < 0.05:
                 is_pure_noise = True
 
-            # 额外排查纯鼓掌/拍手 (Clapping 58, Applause 62)
             clap_score = float(max_scores_per_class[58]) if 58 < len(max_scores_per_class) else 0.0
-            if clap_score > 0.35 and target_score < 0.06:
+            if clap_score > 0.35 and final_target_score < 0.06:
                 is_pure_noise = True
 
             return {
-                "target_score": round(target_score, 3),
-                "slap_score": round(slap_score, 3),
-                "whip_score": round(whip_score, 3),
+                "target_score": final_target_score,
+                "raw_target_score": round(raw_target_score, 3),
+                "custom_score": round(custom_score, 3) if custom_score is not None else None,
+                "embedding": mean_embedding,
                 "is_pure_noise": is_pure_noise,
                 "top1_label": top1_label,
                 "top1_score": round(top1_score, 3)
             }
         except Exception as e:
-            return {"target_score": 0.5, "is_pure_noise": False, "top1_label": "error", "error": str(e)}
+            return {"target_score": 0.5, "is_pure_noise": False, "top1_label": "error", "error": str(e), "embedding": None}

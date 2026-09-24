@@ -93,6 +93,15 @@
                     开始识别
                 </button>
 
+                <!-- 一键微调学习按钮 -->
+                <button id="btn-tune-model" class="px-3.5 py-2 bg-purple-900/40 hover:bg-purple-800/60 text-purple-300 hover:text-white rounded-xl border border-purple-500/40 text-xs font-medium transition flex items-center gap-1.5 shrink-0 shadow-lg shadow-purple-900/20" title="基于您在各个视频中对片段的保留/加锁/删除操作，一键训练调优专属识别模型">
+                    <svg class="w-3.5 h-3.5 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                    </svg>
+                    <span>微调训练</span>
+                    <span id="badge-tuner-samples" class="text-[10px] px-1.5 py-0.2 rounded-full bg-purple-500/30 text-purple-200">0</span>
+                </button>
+
                 <!-- 一键清理缓存按钮 -->
                 <button id="btn-clear-storage" class="px-3.5 py-2 bg-slate-800/80 hover:bg-rose-500/20 text-slate-400 hover:text-rose-400 rounded-xl border border-slate-700/70 hover:border-rose-500/40 text-xs font-medium transition flex items-center gap-1.5 shrink-0" title="一键清空 uploads 与 audio 临时缓存目录">
                     <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -283,6 +292,6 @@
     </footer>
 
     <!-- 业务逻辑脚本 (加版本号避免浏览器304旧缓存) -->
-    <script src="/static/js/app.js?v=10.0"></script>
+    <script src="/static/js/app.js?v=11.0"></script>
 </body>
 </html>
