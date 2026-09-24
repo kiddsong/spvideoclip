@@ -27,6 +27,8 @@ window.addEventListener("DOMContentLoaded", () => {
     const valPre = document.getElementById("val-pre");
     const paramPost = document.getElementById("param-post");
     const valPost = document.getElementById("val-post");
+    const paramAi = document.getElementById("param-ai");
+    const labelAi = document.getElementById("label-ai");
 
     const btnAnalyze = document.getElementById("btn-analyze");
     const btnClearStorage = document.getElementById("btn-clear-storage");
@@ -93,6 +95,12 @@ window.addEventListener("DOMContentLoaded", () => {
                 recalcIntervals();
                 renderEventsList();
             }
+        });
+    }
+    if (paramAi && labelAi) {
+        paramAi.addEventListener("change", (e) => {
+            labelAi.innerText = e.target.checked ? "已开启" : "已关闭";
+            labelAi.className = e.target.checked ? "font-mono text-emerald-400 font-bold text-xs" : "font-mono text-slate-500 font-bold text-xs";
         });
     }
 
@@ -322,6 +330,7 @@ window.addEventListener("DOMContentLoaded", () => {
             formData.append("min_interval", paramInterval.value);
             formData.append("pre_seconds", paramPre.value);
             formData.append("post_seconds", paramPost.value);
+            formData.append("enable_ai", paramAi ? paramAi.checked : true);
 
             try {
                 const resp = await fetch("/api/analyze", {
@@ -426,9 +435,12 @@ window.addEventListener("DOMContentLoaded", () => {
                     <span class="text-base font-mono font-bold ${isLocked ? 'text-amber-200' : 'text-slate-100 group-hover:text-rose-300'} transition">
                         ${formatTime(ev.time)}
                     </span>
-                    <span class="text-[10px] font-medium px-1.5 py-0.5 rounded ${isLocked ? 'bg-amber-500/10 text-amber-300 border-amber-500/30' : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'}">
-                        ${(ev.confidence * 100).toFixed(0)}%
-                    </span>
+                    <div class="flex items-center gap-1">
+                        ${ev.ai_score !== undefined && ev.ai_score !== null ? `<span class="text-[9px] font-mono px-1 py-0.2 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30" title="Google YAMNet AI 判定为拍打/抽打的预测概率: ${(ev.ai_score * 100).toFixed(0)}%">AI ${(ev.ai_score * 100).toFixed(0)}%</span>` : ''}
+                        <span class="text-[10px] font-medium px-1.5 py-0.5 rounded ${isLocked ? 'bg-amber-500/10 text-amber-300 border-amber-500/30' : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'}">
+                            ${(ev.confidence * 100).toFixed(0)}%
+                        </span>
+                    </div>
                 </div>
             `;
             eventsList.appendChild(card);

@@ -92,9 +92,10 @@ async def analyze_video(
     sensitivity: float = Form(0.15),
     pre_seconds: float = Form(1.2),
     post_seconds: float = Form(1.2),
-    min_interval: float = Form(1.5)
+    min_interval: float = Form(1.5),
+    enable_ai: bool = Form(True)
 ):
-    """发起拍打声识别异步分析"""
+    """发起拍打声识别异步分析 (支持 Google YAMNet 深度事件识别)"""
     task_id = f"analyze_{uuid.uuid4().hex[:8]}"
     TASKS_STATUS[task_id] = {
         "status": "running",
@@ -115,6 +116,7 @@ async def analyze_video(
                 pre_seconds=pre_seconds,
                 post_seconds=post_seconds,
                 min_interval_sec=min_interval,
+                enable_ai=enable_ai,
                 progress_cb=on_progress
             )
             TASKS_STATUS[task_id]["status"] = "success"

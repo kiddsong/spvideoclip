@@ -100,9 +100,10 @@ class VideoPipeline:
         pre_seconds: float = 1.2,
         post_seconds: float = 1.2,
         min_interval_sec: float = 1.5,
+        enable_ai: bool = True,
         progress_cb: Optional[Callable[[float, str], None]] = None
     ) -> Dict[str, Any]:
-        """第一阶段：分析视频音频并识别拍打时间戳"""
+        """第一阶段：分析视频音频并识别拍打时间戳 (支持 Google YAMNet 深度学习精滤)"""
         video_path = self._resolve_video_path(video_filename)
 
         if progress_cb: progress_cb(0.1, "正在解析视频元数据...")
@@ -119,11 +120,13 @@ class VideoPipeline:
         if not os.path.exists(wav_path):
             self.audio_extractor.extract_audio(video_path, wav_path)
 
-        if progress_cb: progress_cb(0.6, "正在进行皮肤拍打声学分析与重叠去重...")
+        msg = "正在进行声学瞬态分析与 Google YAMNet AI 深度语义识别..." if enable_ai else "正在进行皮肤拍打声学分析与重叠去重..."
+        if progress_cb: progress_cb(0.6, msg)
         events = self.detector.detect_impacts(
             wav_path,
             sensitivity=sensitivity,
-            min_interval_sec=min_interval_sec
+            min_interval_sec=min_interval_sec,
+            enable_ai=enable_ai
         )
 
         intervals = self.detector.generate_cut_intervals(

@@ -72,6 +72,18 @@
                     <input type="range" id="param-post" min="0.3" max="3.0" step="0.1" value="1.2" class="w-18 accent-cyan-500 cursor-pointer">
                 </div>
 
+                <!-- Google YAMNet AI 模型开关 -->
+                <label class="bg-slate-950/60 px-3 py-1.5 rounded-xl border border-slate-800/80 flex items-center gap-2 cursor-pointer select-none" title="启用 Google YAMNet 521类深度音频事件分类模型，精准锁定 Slap/Whip 并过滤咳嗽、拍手等噪音">
+                    <div class="text-[11px] text-slate-400 flex flex-col">
+                        <span class="flex items-center gap-1">
+                            <span>Google AI</span>
+                            <span class="text-[9px] px-1 py-0.2 rounded bg-rose-500/20 text-rose-400 border border-rose-500/30">YAMNet</span>
+                        </span>
+                        <span id="label-ai" class="font-mono text-emerald-400 font-bold text-xs">已开启</span>
+                    </div>
+                    <input type="checkbox" id="param-ai" checked class="w-4 h-4 accent-rose-500 rounded cursor-pointer">
+                </label>
+
                 <!-- 开始识别按钮 -->
                 <button id="btn-analyze" disabled class="px-5 py-2 bg-gradient-to-r from-rose-600 to-rose-700 hover:from-rose-500 hover:to-rose-600 disabled:opacity-40 disabled:cursor-not-allowed font-medium text-xs text-white rounded-xl shadow-lg shadow-rose-600/30 transition-all flex items-center gap-1.5 shrink-0">
                     <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -271,6 +283,6 @@
     </footer>
 
     <!-- 业务逻辑脚本 (加版本号避免浏览器304旧缓存) -->
-    <script src="/static/js/app.js?v=9.0"></script>
+    <script src="/static/js/app.js?v=10.0"></script>
 </body>
 </html>
