@@ -157,14 +157,15 @@ class ImpactDetector:
 
                 ai_res = self.yamnet.evaluate_clip(clip_16k)
                 target_score = ai_res.get("target_score", 0.0) # Slap/Whip 命中分
-                clap_score = ai_res.get("clap_score", 0.0)
-                knock_score = ai_res.get("knock_score", 0.0)
+                is_pure_noise = ai_res.get("is_pure_noise", False)
 
-                # 误报剔除规则：如果被 YAMNet 明确分类为单纯拍手(Clapping)或敲击(Knock)且拍打分极低，直接剔除
-                if (clap_score > 0.4 or knock_score > 0.4) and target_score < 0.15:
+                # 智能初筛过滤：
+                # 1. 如果经 YAMNet 判定为纯人声/尖叫/哭喊/敲门/脚步/掌声，且完全无 Slap/Whip 拍打特征，则一票否决剔除！
+                if is_pure_noise:
                     continue
 
-                # 融合 AI 预测分值（若 AI 命中 Slap/Whip，将大幅提升其置信度）
+                # 2. 如果存在拍打特征（哪怕是拍打 + 人声/呻吟/叫声/背景音乐混合），均予以坚定保留！
+                # 融合 AI 预测分值：若 AI 命中 Slap/Whip，将大幅提升其置信度
                 blended_confidence = float(np.clip(ev["confidence"] * 0.5 + target_score * 0.5 + 0.1, 0.2, 0.99))
 
                 final_events.append({
