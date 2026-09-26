@@ -4,8 +4,10 @@ python-multipart>=0.0.6
 numpy>=1.23.0
 scipy>=1.10.0
 librosa>=0.10.0
-torch>=2.0.0
-torchaudio>=2.0.0
+onnxruntime>=1.15.0
+scikit-learn>=1.2.0
+joblib>=1.2.0
 tqdm>=4.65.0
 aiofiles>=23.1.0
 jinja2>=3.1.0
+

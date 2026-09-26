@@ -1,14 +1,20 @@
-# SPVideoClip - 拍打声智能识别与定点剪辑合并系统 (v2.5.0)
+# SPVideoClip - SP视频拍打声智能识别与定点剪辑合并系统 (v2.5.0)
 
-[![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](https://www.python.org/)
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.100%2B-009688.svg)](https://fastapi.tiangolo.com/)
-[![ONNX Runtime](https://img.shields.io/badge/ONNX_Runtime-YAMNet-orange.svg)](https://onnxruntime.ai/)
-[![FFmpeg](https://img.shields.io/badge/FFmpeg-Hardware_Accelerated-green.svg)](https://ffmpeg.org/)
-[![License](https://img.shields.io/badge/License-MIT-purple.svg)](LICENSE)
+<p align="center">
+  <a href="https://github.com/kiddsong/videocli"><img src="https://img.shields.io/badge/GitHub-videocli-blue?logo=github" alt="GitHub Repo"></a>
+  <img src="https://img.shields.io/badge/Python-3.10+-3776AB?logo=python&logoColor=white" alt="Python">
+  <img src="https://img.shields.io/badge/FastAPI-0.100+-009688?logo=fastapi&logoColor=white" alt="FastAPI">
+  <img src="https://img.shields.io/badge/AI_Engine-Google_YAMNet_(ONNX)-FF6F00?logo=onnx&logoColor=white" alt="YAMNet">
+  <img src="https://img.shields.io/badge/FFmpeg-Hardware_Accelerated-green?logo=ffmpeg&logoColor=white" alt="FFmpeg">
+  <a href="./LICENSE"><img src="https://img.shields.io/badge/License-MIT-purple.svg" alt="License"></a>
+</p>
 
-**SPVideoClip** 是一款基于 **双轨声学物理瞬态特征分析**、**Google YAMNet 深度事件识别模型** 与 **主动学习（Active Learning）本地微调** 的全自动视频智能剪辑合成系统。
+**SPVideoClip** 是一款基于 **双轨声学物理瞬态特征分析**、**Google YAMNet 深度事件识别模型** 与 **主动学习（Active Learning）本地微调** 的全自动 SP 视频智能剪辑合成系统。
 
-系统针对视频中特定的人体碰撞/抽打/拍打声（Slap / Whip / Impact）进行微秒级定点捕获，自动生成毫秒级平滑过渡区间，并提供全功能现代 H5 交互控制台，支持零拷贝极速导入、四色交互卡片微调、样本自主学习训练以及一键无缝合并输出。
+本系统针对 SP 视频中特定的人体碰撞/抽打/拍打声（Slap / Whip / Impact）进行微秒级定点捕获，自动生成毫秒级平滑过渡区间，并提供全功能现代 H5 交互控制台，支持零拷贝极速导入、四色交互卡片微调、样本自主学习训练以及一键无缝合并输出。
+
+> ⚠️ **重要提示与准入须知**：  
+> 本项目中所述的“SP”，系 BDSM 中的 spanking 分类，中文术语一般为“小圈”。如您是误入本项目或属于未成年人（以您所在国家/地区法律规定的成年年龄和您的法定身份为准），**请勿继续阅读或使用本系统，并请主动关闭离开本页面**。
 
 ---
 
@@ -27,13 +33,14 @@
 - [七、快速开始与操作指南](#七快速开始与操作指南)
 - [八、项目目录架构](#八项目目录架构)
 - [九、常见问题与注意事项（FAQ）](#九常见问题与注意事项faq)
-- [十、开源许可](#十开源许可)
+- [十、免责声明 (Disclaimer)](#十免责声明-disclaimer)
+- [十一、版权与开源许可 (License & Credits)](#十一版权与开源许可-license--credits)
 
 ---
 
 ## 一、项目背景与设计目的
 
-在长视频、教学录像、动作运动或特定音视频内容后期制作中，往往需要从数十分钟甚至数小时的长篇素材中挑出“拍打/击打”动作的高光瞬间。传统人工检索方式耗时费力，且常规依靠单一音量（RMS）阈值的剪辑软件极易受到关门、说话、脚步声、爆破等各种环境噪音的干扰，产生海量误报。
+在 SP 视频内容的后期整理与精彩集锦制作中，往往需要从数十分钟甚至数小时的长篇素材中挑出“拍打/击打”动作的高光瞬间。传统人工检索方式耗时费力，且常规依靠单一音量（RMS）阈值的剪辑软件极易受到关门、说话、脚步声、爆破等各种环境噪音的干扰，产生海量误报。
 
 **SPVideoClip 的核心目标：**
 1. **高召回与高精度兼备**：不仅能够精准捕获肉体皮肤拍打的短时瞬态冲激，更能通过神经网络语义排除非拍打噪音。
@@ -105,7 +112,7 @@
 
 ## 四、界面展示与交互状态说明
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │  SPVideoClip 智能剪辑系统 v2.5.0                  [微调训练 6:1] [清理缓存]  │
 ├──────────────────────────────────────┬──────────────────────────────────────┤
@@ -133,8 +140,7 @@
 
 ### 1. 操作系统
 - **Windows**：Windows 10 / 11（64-bit，最佳推荐，提供原生文件拾取器支持）。
-- **macOS**：macOS 12+（支持 x86_64 及 Apple Silicon M 系列）。
-- **Linux**：Ubuntu 20.04+ / Debian 11+ / CentOS 8+ 等。
+- **macOS / Linux**：也支持跨平台运行（Web 端通用）。
 
 ### 2. 硬件配置
 - **CPU**：推荐 4 核及以上处理器（支持 AVX2 指令集）。
@@ -152,7 +158,7 @@
 
 ### 第一步：克隆代码仓库
 ```bash
-git clone https://github.com/your-username/videocli.git
+git clone https://github.com/kiddsong/videocli.git
 cd videocli
 ```
 
@@ -179,14 +185,8 @@ pip install -r requirements.txt
   1. 前往 [Gyan.dev FFmpeg Builds](https://www.gyan.dev/ffmpeg/builds/) 下载 `ffmpeg-release-essentials.zip`。
   2. 解压并将 `bin` 目录绝对路径（如 `C:\ffmpeg\bin`）添加到系统的 **系统环境变量 -> Path** 中。
   3. 打开新的命令提示符，输入 `ffmpeg -version` 确认安装成功。
-- **macOS 用户**：
-  ```bash
-  brew install ffmpeg
-  ```
-- **Ubuntu/Debian 用户**：
-  ```bash
-  sudo apt update && sudo apt install -y ffmpeg
-  ```
+- **macOS 用户**：`brew install ffmpeg`
+- **Linux (Ubuntu/Debian) 用户**：`sudo apt update && sudo apt install -y ffmpeg`
 
 ---
 
@@ -197,7 +197,7 @@ pip install -r requirements.txt
 ```bash
 python run.py
 ```
-*(Windows 用户也可直接双击 `start.bat`)*
+*(Windows 用户也可直接双击根目录下的 `start.bat`)*
 
 系统会自动启动并在默认浏览器中唤起交互界面：
 ```text
@@ -263,6 +263,7 @@ videocli/
 ├── run.py                       # Python 启动脚本入口
 ├── start.bat                    # Windows 快速双击启动批处理
 ├── requirements.txt             # 项目依赖清单
+├── LICENSE                      # 开源许可证 (MIT)
 └── README.md                    # 项目官方详细技术文档
 ```
 
@@ -284,6 +285,26 @@ videocli/
 
 ---
 
-## 十、开源许可
+## 十、免责声明 (Disclaimer)
 
-本项目基于 [MIT License](LICENSE) 开源。欢迎提交 Pull Request、报告 Issue 或提出宝贵的功能建议！
+1. **合法合规与成人准入原则**：
+   - 本项目属于多媒体信号处理、声学事件检测（AED）与本地自动化剪辑工具。
+   - 本项目及相关说明仅供**年满 18 周岁（或符合用户所在地司法管辖区法定成年年龄）且具备完全民事行为能力的成年人**在私人合法领域中依个人意愿研究、学习及正当创作使用。**严禁未成年人接触、查阅或使用本软件。**
+2. **知情同意与非侵害原则（SSC / RACK 原则）**：
+   - 任何涉及特定亚文化（如 SP/小圈）音视频素材的处理，必须完全建立在**所有参与者知情、自愿且明确同意（Safe, Sane, Consensual / Risk-Aware Consensual Kink）**的基础之上。
+   - **严禁**将本软件用于任何形式的暴力虐待、人身伤害、非法拘禁、家庭暴力、非自愿胁迫、偷拍窃密、侵犯他人隐私权或肖像权的违法违规行为。
+3. **禁止非法分发与不良信息传播**：
+   - **严禁**利用本软件制作、剪辑、存储或通过互联网传播任何违反国家法律法规、侵犯社会公德或侵害他人合法权益的淫秽色情、暴力血腥或不良信息视频内容。
+4. **纯本地离线处理与责任豁免**：
+   - 本软件是一套**纯本地运行的开源脚本工具**，所有音视频解析、神经网络推理与剪辑渲染均在使用者自身的计算机本地离线完成，**开发者既不提供任何云端服务器托管、转码或存储服务，亦不收集或传输用户的任何个人隐私及视频媒体内容**。
+   - 本项目按“现状”（AS IS）提供，开发者不对软件的准确性、完整性或对特定用途的适用性做任何明示或暗示的担保。
+   - 用户使用本软件即代表**完全知悉并自愿遵守上述全部条款**。对于用户因违反法律法规或不正当使用本软件而导致的任何民事赔偿、行政处罚或刑事处罚等直接、间接或连带责任，**均由使用者自行独立承担，开发者及开源贡献者概不承担任何法律责任**。
+
+---
+
+## 十一、版权与开源许可 (License & Credits)
+
+- **源代码许可**：本项目基于 [MIT License](./LICENSE) 协议开源。
+- **Google YAMNet**：Google YAMNet 音频事件分类模型及权重由 Google LLC 研发并开源，遵循 [Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0)。
+- **Wavesurfer.js**：音频波形可视化库基于 [Wavesurfer.js](https://wavesurfer.xyz/)，遵循 [BSD-3-Clause License](https://opensource.org/licenses/BSD-3-Clause)。
+- **其他第三方组件**：FastAPI、Librosa、ONNX Runtime、Scikit-learn、FFmpeg 等遵循其各自的开源许可证。
