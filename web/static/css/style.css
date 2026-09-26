@@ -40,7 +40,7 @@ body {
     background: rgba(255, 255, 255, 0.25);
 }
 
-/* 现代精致滑块样式 (精细扁平化，去除粗笨感) */
+/* 现代精致滑块样式 */
 input[type="range"] {
     -webkit-appearance: none;
     appearance: none;
@@ -81,26 +81,67 @@ input[type="range"]:active::-webkit-slider-thumb {
     box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
 }
 
-/* 片段小卡片精致微阴影与流光动效 (显著提升与大背景的区分度) */
+/* ------------------------------------------------------------- */
+/* 片段卡片色彩状态机样式系统 (绿/黄/红/灰/默认)                  */
+/* ------------------------------------------------------------- */
+
+/* 1. 默认正常状态：深灰蓝饱满底色，与大背景界限清晰 */
 .clip-card {
-    transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
-    background: #111827; /* 采用饱满的深灰蓝底色，清晰从底板脱出 */
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    box-shadow: 0 4px 12px -2px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    transition: all 0.16s cubic-bezier(0.16, 1, 0.3, 1);
+    background: #111827;
+    border: 1px solid rgba(255, 255, 255, 0.13);
+    box-shadow: 0 3px 10px -2px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
 .clip-card:hover {
     transform: translateY(-2px);
-    border-color: rgba(244, 63, 94, 0.6);
-    background: #1e2638;
-    box-shadow: 0 8px 24px -4px rgba(0, 0, 0, 0.75), 0 0 0 1px rgba(244, 63, 94, 0.35);
+    border-color: rgba(255, 255, 255, 0.3);
+    background: #192236;
+    box-shadow: 0 6px 20px -3px rgba(0, 0, 0, 0.7);
 }
+
+/* 2. 正在播放 / 选中状态：立刻变绿 */
+.clip-card.is-active {
+    background: #09281a !important;
+    border-color: #10b981 !important;
+    box-shadow: 0 0 0 1.5px rgba(16, 185, 129, 0.5), 0 6px 20px -2px rgba(16, 185, 129, 0.25) !important;
+}
+.clip-card.is-active:hover {
+    background: #0c3422 !important;
+    border-color: #34d399 !important;
+}
+
+/* 3. 锁住状态 (正样本)：变黄/琥珀暗金 */
 .clip-card.is-locked {
-    background: #23190e;
-    border-color: rgba(245, 158, 11, 0.5);
-    box-shadow: 0 4px 12px -2px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(245, 158, 11, 0.15);
+    background: #2a1c0d !important;
+    border-color: #f59e0b !important;
+    box-shadow: 0 0 0 1px rgba(245, 158, 11, 0.4), 0 6px 18px -2px rgba(245, 158, 11, 0.2) !important;
 }
 .clip-card.is-locked:hover {
-    border-color: rgba(245, 158, 11, 0.85);
-    background: #2e2013;
-    box-shadow: 0 8px 24px -4px rgba(0, 0, 0, 0.75), 0 0 0 1px rgba(245, 158, 11, 0.4);
+    background: #362410 !important;
+    border-color: #fbbf24 !important;
+}
+
+/* 4. 标记为负面样本状态：变成红色 (不再删除卡片) */
+.clip-card.is-negative {
+    background: #2c0e14 !important;
+    border-color: #f43f5e !important;
+    box-shadow: 0 0 0 1px rgba(244, 63, 94, 0.4), 0 6px 18px -2px rgba(244, 63, 94, 0.2) !important;
+}
+.clip-card.is-negative:hover {
+    background: #39121a !important;
+    border-color: #fb7185 !important;
+}
+
+/* 5. 点击删除后：变成暗灰色 (已废弃/移除态) */
+.clip-card.is-deleted {
+    background: #0d1117 !important;
+    border-color: rgba(255, 255, 255, 0.08) !important;
+    opacity: 0.45 !important;
+    filter: grayscale(85%) !important;
+    box-shadow: none !important;
+}
+.clip-card.is-deleted:hover {
+    opacity: 0.75 !important;
+    filter: grayscale(40%) !important;
+    border-color: rgba(255, 255, 255, 0.2) !important;
 }

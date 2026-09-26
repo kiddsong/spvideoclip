@@ -5,6 +5,7 @@ window.addEventListener("DOMContentLoaded", () => {
         uploadedFile: null,       // 上传返回信息
         events: [],               // 识别到的拍打事件点
         intervals: [],            // 最终剪辑合并区间
+        activeEventIndex: null,   // 当前正在播放/点击的片段索引 (变绿高亮)
         currentTaskId: null,
         pollingTimer: null
     };
@@ -379,12 +380,15 @@ window.addEventListener("DOMContentLoaded", () => {
 
     // 识别完成后的数据呈现
     function onDetectionComplete(result) {
-        // 每个识别点增加 locked 属性 (默认未加锁 false)
+        // 每个识别点初始化状态
         state.events = (result.events || []).map(ev => ({
             ...ev,
-            locked: false
+            locked: false,      // 是否加锁变黄 (正样本)
+            is_negative: false, // 是否标记负面变红 (负样本)
+            is_deleted: false   // 是否删除变灰 (废弃)
         }));
-        state.intervals = result.intervals || [];
+        state.activeEventIndex = null;
+        recalcIntervals();
 
         // 渲染事件列表
         renderEventsList();
@@ -397,11 +401,13 @@ window.addEventListener("DOMContentLoaded", () => {
         hideProgress();
     }
 
-    // 渲染识别出的拍打列表与截取区间 (支持锁定与极简展示)
+    // 渲染识别出的拍打列表与截取区间 (支持全新四色状态机：绿/黄/红/灰)
     function renderEventsList() {
         if (!eventsList) return;
 
-        if (badgeCount) badgeCount.innerText = `${state.events.length} 个片段`;
+        // 计算有效片段数量 (排除已删除灰色与负面红色)
+        const validEvents = state.events.filter(ev => !ev.is_deleted && !ev.is_negative);
+        if (badgeCount) badgeCount.innerText = `${validEvents.length} 个片段`;
 
         if (state.events.length === 0) {
             eventsList.innerHTML = `
@@ -415,67 +421,98 @@ window.addEventListener("DOMContentLoaded", () => {
         eventsList.innerHTML = "";
         state.events.forEach((ev, idx) => {
             const isLocked = !!ev.locked;
+            const isNegative = !!ev.is_negative;
+            const isDeleted = !!ev.is_deleted;
+            const isActive = (state.activeEventIndex === idx);
+
             const card = document.createElement("div");
 
-            // 卡片样式：采用 clip-card 现代轻量玻璃质感，避免傻大笨粗
-            card.className = `clip-card cursor-pointer select-none flex flex-col justify-between p-2.5 rounded-xl transition-all duration-150 group ${isLocked ? 'is-locked ring-1 ring-amber-500/30' : ''}`;
+            // 四色状态样式判定：
+            // 灰色优先(删除) > 红色优先(负面) > 黄色(锁住) > 绿色(点击播放激活)
+            let statusClass = "";
+            if (isDeleted) {
+                statusClass = "is-deleted"; // 灰色
+            } else if (isNegative) {
+                statusClass = "is-negative"; // 红色
+            } else if (isLocked) {
+                statusClass = "is-locked"; // 黄色
+            } else if (isActive) {
+                statusClass = "is-active"; // 绿色
+            }
 
-            // 点击卡片任意一处均跳转播放
-            card.onclick = () => jumpToTime(ev.time);
+            card.className = `clip-card cursor-pointer select-none flex flex-col justify-between p-2.5 rounded-xl transition-all duration-150 group ${statusClass}`;
 
-            // 锁按钮的图标状态
+            // 点击卡片任意一处均跳转播放并立刻变绿
+            card.onclick = () => {
+                jumpToTime(ev.time, idx);
+            };
+
+            // 1. 锁按钮的图标状态 (黄色)
             const lockIcon = isLocked
                 ? `<svg class="w-3.5 h-3.5 text-amber-400" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clip-rule="evenodd"/></svg>`
-                : `<svg class="w-3.5 h-3.5 text-slate-400 hover:text-slate-200" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z"/></svg>`;
+                : `<svg class="w-3.5 h-3.5 text-slate-400 hover:text-amber-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z"/></svg>`;
 
-            // “负面”按钮：将该片段标记为负面样本(非拍打噪音)并删除
-            const negativeBtn = isLocked
-                ? `<span class="p-1 text-slate-600 cursor-not-allowed opacity-25" title="已锁定">
-                     <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                   </span>`
-                : `<button class="p-1 text-slate-400 hover:text-amber-400 hover:bg-amber-500/10 rounded-md transition" title="标记为负面样本(噪音误报)并删除" onclick="event.stopPropagation(); markNegative(${idx});">
-                     <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                   </button>`;
+            // 2. “负面”按钮状态 (红色)：点击变红并入负样本库，再次点击取消负面并移出样本库
+            const negativeIcon = isNegative
+                ? `<svg class="w-3.5 h-3.5 text-rose-400" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM7 9a1 1 0 000 2h6a1 1 0 100-2H7z" clip-rule="evenodd"/></svg>`
+                : `<svg class="w-3.5 h-3.5 text-slate-400 hover:text-rose-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>`;
 
-            // “删除”按钮：仅删除片段，不加入负面样本
-            const deleteBtn = isLocked
-                ? `<span class="p-1 text-slate-600 cursor-not-allowed opacity-25" title="已锁定">
-                     <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-                   </span>`
-                : `<button class="p-1 text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 rounded-md transition" title="仅删除片段(不影响AI模型)" onclick="event.stopPropagation(); removeEvent(${idx});">
-                     <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-                   </button>`;
+            // 3. “删除”按钮状态 (灰色)：点击变灰，再次点击恢复
+            const deleteIcon = isDeleted
+                ? `<svg class="w-3.5 h-3.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" title="已删除(点击恢复)"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>`
+                : `<svg class="w-3.5 h-3.5 text-slate-400 hover:text-slate-200" fill="none" viewBox="0 0 24 24" stroke="currentColor" title="删除该片段(变灰)"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>`;
 
             // AI 置信率显示逻辑：只显示一个 AI 置信率
             const aiScoreVal = (ev.ai_score !== undefined && ev.ai_score !== null)
                 ? (ev.ai_score * 100).toFixed(0)
                 : (ev.confidence * 100).toFixed(0);
 
+            // 徽章背景色彩
+            let badgeBg = "bg-white/5 text-slate-300 border-white/10";
+            let timeColor = "text-slate-100 group-hover:text-rose-300";
+            if (isDeleted) {
+                badgeBg = "bg-white/5 text-slate-500 border-white/5";
+                timeColor = "text-slate-500 line-through";
+            } else if (isNegative) {
+                badgeBg = "bg-rose-500/20 text-rose-300 border-rose-500/35";
+                timeColor = "text-rose-200";
+            } else if (isLocked) {
+                badgeBg = "bg-amber-500/20 text-amber-300 border-amber-500/35";
+                timeColor = "text-amber-200";
+            } else if (isActive) {
+                badgeBg = "bg-emerald-500/20 text-emerald-300 border-emerald-500/35";
+                timeColor = "text-emerald-300";
+            }
+
             card.innerHTML = `
                 <!-- 顶部序列与控制按钮 -->
                 <div class="flex items-center justify-between mb-1.5">
-                    <span class="w-5 h-5 rounded-md ${isLocked ? 'bg-amber-500/15 text-amber-300 border border-amber-500/30' : 'bg-white/5 text-slate-300 border border-white/10 group-hover:bg-rose-500/20 group-hover:text-rose-300 group-hover:border-rose-500/30'} text-[10px] flex items-center justify-center font-mono font-bold transition">
+                    <span class="w-5 h-5 rounded-md ${badgeBg} text-[10px] flex items-center justify-center font-mono font-bold border transition">
                         #${idx + 1}
                     </span>
-                    <div class="flex items-center gap-0.5 opacity-75 group-hover:opacity-100 transition">
-                        <!-- 锁按钮 -->
-                        <button class="p-1 hover:bg-white/5 rounded-md transition" title="${isLocked ? '已加锁保护(点击解锁)' : '锁定该片段(不可删除/舍弃)'}" onclick="event.stopPropagation(); toggleLock(${idx});">
+                    <div class="flex items-center gap-0.5 opacity-80 group-hover:opacity-100 transition">
+                        <!-- 锁按钮 (黄) -->
+                        <button class="p-1 hover:bg-white/10 rounded-md transition" title="${isLocked ? '已加锁(点击解锁并移出正样本库)' : '锁住该片段(变黄并加入正样本库)'}" onclick="event.stopPropagation(); toggleLock(${idx});">
                             ${lockIcon}
                         </button>
-                        <!-- 负面按钮 (加入负面样本并删除) -->
-                        ${negativeBtn}
-                        <!-- 删除按钮 (仅删除不加入负样本) -->
-                        ${deleteBtn}
+                        <!-- 负面按钮 (红) -->
+                        <button class="p-1 hover:bg-white/10 rounded-md transition" title="${isNegative ? '已标记为负面(点击取消并移出负样本库)' : '标记为负面样本(变红并加入负样本库)'}" onclick="event.stopPropagation(); toggleNegative(${idx});">
+                            ${negativeIcon}
+                        </button>
+                        <!-- 删除按钮 (灰) -->
+                        <button class="p-1 hover:bg-white/10 rounded-md transition" title="${isDeleted ? '已删除(点击恢复)' : '删除该片段(变灰不合成)'}" onclick="event.stopPropagation(); toggleDelete(${idx});">
+                            ${deleteIcon}
+                        </button>
                     </div>
                 </div>
 
                 <!-- 拍打发生时间码与唯一定位的 AI 置信率 -->
                 <div class="flex items-baseline justify-between mt-0.5">
-                    <span class="text-sm font-mono font-bold tracking-tight ${isLocked ? 'text-amber-200' : 'text-slate-100 group-hover:text-rose-300'} transition">
+                    <span class="text-sm font-mono font-bold tracking-tight ${timeColor} transition">
                         ${formatTime(ev.time)}
                     </span>
-                    <span class="text-[10px] font-mono font-semibold px-1.5 py-0.5 rounded-full ${isLocked ? 'bg-amber-500/15 text-amber-300 border border-amber-500/25' : 'bg-purple-500/15 text-purple-300 border border-purple-500/25'}" title="Google YAMNet AI 判定为拍打/抽打的预测置信率: ${aiScoreVal}%">
-                        AI ${aiScoreVal}%
+                    <span class="text-[10px] font-mono font-semibold px-1.5 py-0.5 rounded-full ${isDeleted ? 'bg-white/5 text-slate-500 border border-white/5' : isNegative ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30' : isLocked ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' : isActive ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-purple-500/15 text-purple-300 border border-purple-500/25'}" title="AI 拍打置信率: ${aiScoreVal}%">
+                        ${isDeleted ? '已丢弃' : isNegative ? '负样本' : isLocked ? '已锁定' : `AI ${aiScoreVal}%`}
                     </span>
                 </div>
             `;
@@ -514,107 +551,154 @@ window.addEventListener("DOMContentLoaded", () => {
         } catch (e) {}
     }
 
-    // 切换锁定状态 (锁定视为用户确认的正样本 1)
+    // 从后端样本库移除用户反馈
+    async function removeFeedback(items) {
+        if (!items || items.length === 0) return;
+        try {
+            await fetch("/api/tuner/remove-feedback", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ items: items })
+            });
+            refreshTunerStats();
+        } catch (e) {}
+    }
+
+    // 1. 切换锁定状态 (变黄入正样本库；取消锁变回并移出正样本库)
     window.toggleLock = function(index) {
         if (!state.events[index]) return;
-        state.events[index].locked = !state.events[index].locked;
-        renderEventsList();
+        const ev = state.events[index];
 
-        // 当用户主动加锁时，自动采集为【正样本】
-        if (state.events[index].locked && state.events[index].embedding) {
-            submitFeedback([{
-                embedding: state.events[index].embedding,
-                label: 1
-            }]);
+        if (ev.locked) {
+            // 取消锁住：移出正样本库
+            ev.locked = false;
+            if (ev.embedding) {
+                removeFeedback([{ embedding: ev.embedding, label: 1 }]);
+            }
+        } else {
+            // 设为锁住：变黄，并加入正样本库
+            ev.locked = true;
+            ev.is_deleted = false; // 加锁自动解除删除
+            if (ev.is_negative) {
+                // 如果之前是负面，先解除负面并移出负样本库
+                ev.is_negative = false;
+                if (ev.embedding) {
+                    removeFeedback([{ embedding: ev.embedding, label: 0 }]);
+                }
+            }
+            if (ev.embedding) {
+                submitFeedback([{ embedding: ev.embedding, label: 1 }]);
+            }
         }
+
+        recalcIntervals();
+        renderEventsList();
     };
 
-    // 全局跳跃时间函数 (暴露给行内 onclick)
-    window.jumpToTime = function(sec) {
-        if (!playerOriginal) return;
-        playerOriginal.currentTime = Math.max(0, sec - 0.5);
-        playerOriginal.play();
-    };
-
-    // 仅删除单项：纯粹移除片段，不作为负面样本记录
-    window.removeEvent = function(index) {
+    // 2. 切换负面状态 (变红入负样本库；取消负面变回并移出负样本库)
+    window.toggleNegative = function(index) {
         if (!state.events[index]) return;
-        if (state.events[index].locked) {
+        const ev = state.events[index];
+
+        if (ev.is_negative) {
+            // 取消负面：变回并从负样本库中移除
+            ev.is_negative = false;
+            if (ev.embedding) {
+                removeFeedback([{ embedding: ev.embedding, label: 0 }]);
+            }
+        } else {
+            // 标记为负面：变红并加入负样本库
+            ev.is_negative = true;
+            ev.is_deleted = false;
+            if (ev.locked) {
+                // 如果之前锁住，解除锁并移出正样本库
+                ev.locked = false;
+                if (ev.embedding) {
+                    removeFeedback([{ embedding: ev.embedding, label: 1 }]);
+                }
+            }
+            if (ev.embedding) {
+                submitFeedback([{ embedding: ev.embedding, label: 0 }]);
+            }
+        }
+
+        recalcIntervals();
+        renderEventsList();
+    };
+
+    // 3. 切换删除状态 (变灰；再次点击取消删除变回)
+    window.toggleDelete = function(index) {
+        if (!state.events[index]) return;
+        const ev = state.events[index];
+
+        if (ev.locked) {
             alert("该片段已被锁定保护，无法删除！如需删除请先点击锁图标解锁。");
             return;
         }
 
-        // 仅从列表中移除片段，不提交任何负样本反馈
-        state.events.splice(index, 1);
+        // 仅切换废弃状态变灰，不加入负面样本库
+        ev.is_deleted = !ev.is_deleted;
         recalcIntervals();
         renderEventsList();
     };
 
-    // 标记为负面样本并删除：明确属于噪音误报，提交给AI模型学习排除
-    window.markNegative = function(index) {
-        if (!state.events[index]) return;
-        if (state.events[index].locked) {
-            alert("该片段已被锁定保护，无法操作！如需标记负面请先点击锁图标解锁。");
-            return;
-        }
+    // 兼容原调用的 removeEvent
+    window.removeEvent = window.toggleDelete;
 
-        const removed = state.events[index];
-        // 明确将该片段作为【负样本】采集学习
-        if (removed && removed.embedding) {
-            submitFeedback([{
-                embedding: removed.embedding,
-                label: 0
-            }]);
+    // 全局跳跃时间函数 (点击卡片立刻跳转播放并变绿)
+    window.jumpToTime = function(sec, idx = null) {
+        if (!playerOriginal) return;
+        if (idx !== null) {
+            state.activeEventIndex = idx;
+            renderEventsList();
         }
-
-        state.events.splice(index, 1);
-        recalcIntervals();
-        renderEventsList();
+        playerOriginal.currentTime = Math.max(0, sec - 0.5);
+        playerOriginal.play();
     };
 
-    // 批量舍弃：舍弃当前时间点之前的所有未锁定片段 (仅裁剪丢弃，不加入负面样本)
+    // 批量舍弃：将当前时间点之前的所有未锁定片段标记为已删除 (变灰)
     if (btnDiscardBefore) {
         btnDiscardBefore.addEventListener("click", () => {
             if (!playerOriginal || state.events.length === 0) return;
             const curTime = playerOriginal.currentTime;
-            const toRemove = state.events.filter(ev => ev.time < curTime && !ev.locked);
+            const toDiscard = state.events.filter(ev => ev.time < curTime && !ev.locked && !ev.is_deleted);
 
-            if (toRemove.length === 0) {
+            if (toDiscard.length === 0) {
                 alert(`在当前时间点 ${formatTime(curTime)} 之前没有可舍弃的未锁定片段。`);
                 return;
             }
 
-            const confirmed = confirm(`确定要舍弃 ${formatTime(curTime)} 之前的所有未锁定片段吗？\n共将移除 ${toRemove.length} 个片段（仅删除，不计入负面样本库）。已锁定的片段将保留。`);
+            const confirmed = confirm(`确定要舍弃 ${formatTime(curTime)} 之前的片段吗？\n共将把 ${toDiscard.length} 个片段标记为已丢弃(变灰，不参与合并)。已锁定的片段将保留。`);
             if (!confirmed) return;
 
-            state.events = state.events.filter(ev => ev.time >= curTime || ev.locked);
+            toDiscard.forEach(ev => { ev.is_deleted = true; });
             recalcIntervals();
             renderEventsList();
         });
     }
 
-    // 批量舍弃：舍弃当前时间点之后的所有未锁定片段 (仅裁剪丢弃，不加入负面样本)
+    // 批量舍弃：将当前时间点之后的所有未锁定片段标记为已删除 (变灰)
     if (btnDiscardAfter) {
         btnDiscardAfter.addEventListener("click", () => {
             if (!playerOriginal || state.events.length === 0) return;
             const curTime = playerOriginal.currentTime;
-            const toRemove = state.events.filter(ev => ev.time > curTime && !ev.locked);
+            const toDiscard = state.events.filter(ev => ev.time > curTime && !ev.locked && !ev.is_deleted);
 
-            if (toRemove.length === 0) {
+            if (toDiscard.length === 0) {
                 alert(`在当前时间点 ${formatTime(curTime)} 之后没有可舍弃的未锁定片段。`);
                 return;
             }
 
-            const confirmed = confirm(`确定要舍弃 ${formatTime(curTime)} 之后的所有未锁定片段吗？\n共将移除 ${toRemove.length} 个片段（仅删除，不计入负面样本库）。已锁定的片段将保留。`);
+            const confirmed = confirm(`确定要舍弃 ${formatTime(curTime)} 之后的片段吗？\n共将把 ${toDiscard.length} 个片段标记为已丢弃(变灰，不参与合并)。已锁定的片段将保留。`);
             if (!confirmed) return;
 
-            state.events = state.events.filter(ev => ev.time <= curTime || ev.locked);
+            toDiscard.forEach(ev => { ev.is_deleted = true; });
             recalcIntervals();
             renderEventsList();
         });
     }
 
-    // 重新计算并融合区间
+    // 重新计算并融合区间 (仅有效片段：!is_deleted && !is_negative 参与生成区间和合并)
     function recalcIntervals() {
         if (!state.uploadedFile || !state.uploadedFile.video_info) return;
 
@@ -622,7 +706,10 @@ window.addEventListener("DOMContentLoaded", () => {
         const post = parseFloat(paramPost.value) || 1.0;
         const videoDur = state.uploadedFile.video_info.duration;
 
-        const raw = state.events.map(ev => [
+        // 仅筛选有效片段
+        const validEvents = state.events.filter(ev => !ev.is_deleted && !ev.is_negative);
+
+        const raw = validEvents.map(ev => [
             Math.max(0, ev.time - pre),
             Math.min(videoDur, ev.time + post)
         ]).sort((a, b) => a[0] - b[0]);
@@ -675,8 +762,8 @@ window.addEventListener("DOMContentLoaded", () => {
             // 隐藏旧的成功说明
             if (btnMergeSuccess) btnMergeSuccess.classList.add("hidden");
 
-            // 自动把用户最终认可并合成的所有片段作为【正样本】收集
-            const posItems = state.events.filter(it => it.embedding).map(it => ({
+            // 自动把用户最终认可并合成的有效片段作为【正样本】收集
+            const posItems = state.events.filter(it => !it.is_deleted && !it.is_negative && it.embedding).map(it => ({
                 embedding: it.embedding,
                 label: 1
             }));

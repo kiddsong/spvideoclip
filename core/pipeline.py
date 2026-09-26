@@ -98,6 +98,7 @@ class VideoPipeline:
                         input_path=video_path,
                         output_mp4_path=preview_path,
                         total_duration=video_info.get("duration", 0.0),
+                        video_info=video_info,
                         progress_callback=on_progress
                     )
                     self.transcode_progress[preview_filename] = {

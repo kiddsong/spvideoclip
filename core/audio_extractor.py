@@ -75,19 +75,47 @@ class AudioExtractor:
             return True
         return False
 
+    def can_stream_copy(self, info: Dict[str, Any]) -> bool:
+        """检查视频是否可以直接使用 -c copy 毫秒级极速换封装为 MP4"""
+        v_codec = info.get("v_codec", "").lower()
+        a_codec = info.get("a_codec", "").lower()
+        # 视频是 H.264 且音频是 AAC/MP3 时，完全无需重新编码，直接 0.2 秒转封装！
+        return v_codec in ["h264", "avc1"] and a_codec in ["aac", "mp3", ""]
+
     def convert_to_web_preview(
         self,
         input_path: str,
         output_mp4_path: str,
         total_duration: float = 0.0,
+        video_info: Optional[Dict[str, Any]] = None,
         progress_callback: Optional[Callable[[float, str], None]] = None
     ) -> str:
         """
-        将古老格式或不兼容编码转为 H5 友好 Web MP4，并实时解析 FFmpeg 管道向外部推送百分比进度
+        双剑合璧方案：
+        1. 优先尝试 -c copy 智能极速转封装（0.2 秒秒开，画质零损失）；
+        2. 若属于真·老旧编码（WMV/RMVB/XVID 等），启动 ultrafast 硬件转码管道，并实时报告进度。
         """
         os.makedirs(os.path.dirname(output_mp4_path), exist_ok=True)
         temp_output = output_mp4_path + ".tmp.mp4"
 
+        # 判断是否能够直接 copy 流 (0.2 秒神速)
+        if video_info and self.can_stream_copy(video_info):
+            if progress_callback:
+                progress_callback(0.5, "检测到 H.264 编码，正在进行 0.2 秒极速无损封装转换...")
+            cmd_copy = [
+                "ffmpeg", "-y",
+                "-i", input_path,
+                "-c", "copy",
+                "-movflags", "+faststart",
+                output_mp4_path
+            ]
+            res = subprocess.run(cmd_copy, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            if res.returncode == 0 and os.path.exists(output_mp4_path) and os.path.getsize(output_mp4_path) > 1024:
+                if progress_callback:
+                    progress_callback(1.0, "极速转封装完成，秒开播放！")
+                return output_mp4_path
+
+        # 无法 copy 时，走 ultrafast 重编码流程
         cmd = [
             "ffmpeg",
             "-y",

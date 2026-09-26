@@ -272,6 +272,15 @@ async def record_user_feedback(req: FeedbackBatchRequest):
     stats = tuner.record_feedback(embeddings, labels)
     return {"status": "success", "stats": stats}
 
+@app.post("/api/tuner/remove-feedback")
+async def remove_user_feedback(req: FeedbackBatchRequest):
+    """当用户取消加锁或取消标记为负面时，从样本库中移除该样本"""
+    tuner = pipeline.detector.yamnet.tuner
+    embeddings = [np.array(it.embedding, dtype=np.float32) for it in req.items if it.embedding]
+    labels = [it.label for it in req.items if it.embedding]
+    stats = tuner.remove_feedback(embeddings, labels)
+    return {"status": "success", "stats": stats}
+
 @app.post("/api/tuner/train")
 async def train_custom_head(ratio: Optional[float] = Form(6.0)):
     """触发本地一键微调训练，更新专属模型权重 (支持指定正负样本配比，大于10为全量)"""

@@ -87,6 +87,40 @@ class YAMNetTuner:
         np.savez_compressed(self.samples_file, features=all_X, labels=all_y)
         return self.get_stats()
 
+    def remove_feedback(self, embeddings: List[np.ndarray], labels: List[int]) -> Dict[str, Any]:
+        """
+        从样本库中移除指定的人工反馈样本（取消加锁或取消标记负面）
+        通过特征向量欧氏距离精确定位并剔除
+        """
+        if not os.path.exists(self.samples_file) or not embeddings:
+            return self.get_stats()
+
+        try:
+            data = np.load(self.samples_file)
+            X = data['features']
+            y = data['labels']
+
+            keep_mask = np.ones(len(y), dtype=bool)
+
+            for target_emb, target_lbl in zip(embeddings, labels):
+                target_vec = np.asarray(target_emb, dtype=np.float32)
+                # 寻找 label 匹配且欧氏距离极小的行
+                candidates = np.where((y == target_lbl) & keep_mask)[0]
+                if len(candidates) > 0:
+                    dists = np.linalg.norm(X[candidates] - target_vec, axis=1)
+                    min_idx = np.argmin(dists)
+                    if dists[min_idx] < 1e-3: # 精确命中
+                        keep_mask[candidates[min_idx]] = False
+
+            new_X = X[keep_mask]
+            new_y = y[keep_mask]
+
+            np.savez_compressed(self.samples_file, features=new_X, labels=new_y)
+        except Exception as e:
+            print("移除反馈样本失败:", e)
+
+        return self.get_stats()
+
     def train(self, ratio_multiplier: Optional[float] = 6.0) -> Dict[str, Any]:
         """
         核心微调训练：
