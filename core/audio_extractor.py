@@ -38,9 +38,18 @@ class AudioExtractor:
             video_path
         ]
         try:
-            result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, check=True)
+            result = subprocess.run(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                check=True
+            )
             data = json.loads(result.stdout)
-            duration = float(data.get("format", {}).get("duration", 0.0))
+            format_info = data.get("format", {})
+            duration = float(format_info.get("duration", 0.0))
 
             width = 0
             height = 0
@@ -55,16 +64,29 @@ class AudioExtractor:
                 elif stream.get("codec_type") == "audio" and not a_codec:
                     a_codec = stream.get("codec_name", "").lower()
 
+            # 针对部分老旧容器 (如 rm/wmv)，如果 format 没有 duration，尝试从视频或音频流中取
+            if duration <= 0:
+                for stream in data.get("streams", []):
+                    try:
+                        d = float(stream.get("duration", 0.0))
+                        if d > duration:
+                            duration = d
+                    except Exception:
+                        pass
+
             return {
                 "duration": duration,
                 "width": width,
                 "height": height,
                 "v_codec": v_codec,
                 "a_codec": a_codec,
-                "size_bytes": int(data.get("format", {}).get("size", 0))
+                "size_bytes": int(format_info.get("size", 0))
             }
+        except subprocess.CalledProcessError as e:
+            err_msg = e.stderr.strip() if e.stderr else str(e)
+            raise RuntimeError(f"FFprobe 解析文件失败: {err_msg}")
         except Exception as e:
-            raise RuntimeError(f"获取视频元数据失败: {str(e)}")
+            raise RuntimeError(f"解析视频元数据结构失败: {str(e)}")
 
     def is_browser_native(self, video_path: str, info: Dict[str, Any]) -> bool:
         """
@@ -253,9 +275,18 @@ class AudioExtractor:
         ]
 
         try:
-            result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, check=True)
+            result = subprocess.run(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                check=True
+            )
             if not os.path.exists(output_wav_path) or os.path.getsize(output_wav_path) == 0:
                 raise RuntimeError("音频导出文件为空或生成失败")
             return output_wav_path
         except subprocess.CalledProcessError as e:
-            raise RuntimeError(f"FFmpeg 音频提取失败: {e.stderr}")
+            err_msg = e.stderr.strip() if e.stderr else str(e)
+            raise RuntimeError(f"FFmpeg 音频提取失败: {err_msg}")
