@@ -87,9 +87,10 @@ class YAMNetTuner:
         np.savez_compressed(self.samples_file, features=all_X, labels=all_y)
         return self.get_stats()
 
-    def train(self) -> Dict[str, Any]:
+    def train(self, ratio_multiplier: Optional[float] = 6.0) -> Dict[str, Any]:
         """
-        核心微调训练：引入智能配额平衡器，彻底解决 7:1 样本失衡问题
+        核心微调训练：
+        ratio_multiplier: 正负样本配额倍数 (3.0 ~ 10.0；若传 None 或 > 10.0 则为全量正样本参与训练)
         """
         if not os.path.exists(self.samples_file):
             raise ValueError("尚未收集到任何人工反馈样本，无法微调")
@@ -117,19 +118,26 @@ class YAMNetTuner:
         X_pos_all = X_all[pos_mask]
         y_pos_all = y_all[pos_mask]
 
-        # 2. 动态配额约束：提升正样本配额上限至负样本的 5.0 倍 (允许更丰富的拍打声学多样性)
-        max_pos_allowed = int(raw_neg_count * 5.0)
-
-        if raw_pos_count > max_pos_allowed:
-            # 采用时间加权均匀采样：兼顾历史多样性与最新的拍打特征
-            indices = np.linspace(0, raw_pos_count - 1, max_pos_allowed, dtype=int)
-            X_pos = X_pos_all[indices]
-            y_pos = y_pos_all[indices]
-            balanced_pos_count = len(X_pos)
-        else:
+        # 2. 动态配额约束：根据用户的参数调节进行比例控制 (3~10，大于10为全量)
+        if ratio_multiplier is None or ratio_multiplier > 10.0:
+            # 全量正样本参与
             X_pos = X_pos_all
             y_pos = y_pos_all
             balanced_pos_count = raw_pos_count
+            applied_ratio_str = f"全量 ({raw_pos_count/raw_neg_count:.1f}:1)"
+        else:
+            max_pos_allowed = int(raw_neg_count * float(ratio_multiplier))
+            if raw_pos_count > max_pos_allowed:
+                indices = np.linspace(0, raw_pos_count - 1, max_pos_allowed, dtype=int)
+                X_pos = X_pos_all[indices]
+                y_pos = y_pos_all[indices]
+                balanced_pos_count = len(X_pos)
+                applied_ratio_str = f"{ratio_multiplier:.1f}:1"
+            else:
+                X_pos = X_pos_all
+                y_pos = y_pos_all
+                balanced_pos_count = raw_pos_count
+                applied_ratio_str = f"{raw_pos_count/raw_neg_count:.1f}:1"
 
         # 组合经过平衡配额处理后的训练集
         X_train = np.vstack([X_pos, X_neg])
@@ -145,7 +153,6 @@ class YAMNetTuner:
 
         # 评估准确度
         train_acc = float(clf.score(X_train, y_train))
-        # 评估在全局总历史库上的表现
         global_acc = float(clf.score(X_all, y_all))
 
         return {
@@ -154,10 +161,10 @@ class YAMNetTuner:
             "neg_count": raw_neg_count,
             "active_pos": balanced_pos_count,
             "active_neg": raw_neg_count,
-            "ratio_applied": f"{balanced_pos_count/raw_neg_count:.1f}:1",
+            "ratio_applied": applied_ratio_str,
             "train_accuracy": round(train_acc, 3),
             "global_accuracy": round(global_acc, 3),
-            "message": f"微调训练成功！已应用智能平衡器 (历史总库: {raw_pos_count}+/{raw_neg_count}-，自动平衡配额为 {balanced_pos_count}+/{raw_neg_count}-，拟合准确度: {round(train_acc*100, 1)}%)"
+            "message": f"微调训练成功！配比设置: {applied_ratio_str} (训练样本: {balanced_pos_count}+ / {raw_neg_count}-，拟合准确度: {round(train_acc*100, 1)}%)"
         }
 
     def clear_samples(self) -> Dict[str, Any]:

@@ -246,11 +246,11 @@ async def record_user_feedback(req: FeedbackBatchRequest):
     return {"status": "success", "stats": stats}
 
 @app.post("/api/tuner/train")
-async def train_custom_head():
-    """触发本地一键微调训练，更新专属模型权重"""
+async def train_custom_head(ratio: Optional[float] = Form(6.0)):
+    """触发本地一键微调训练，更新专属模型权重 (支持指定正负样本配比，大于10为全量)"""
     tuner = pipeline.detector.yamnet.tuner
     try:
-        res = tuner.train()
+        res = tuner.train(ratio_multiplier=ratio)
         return res
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))

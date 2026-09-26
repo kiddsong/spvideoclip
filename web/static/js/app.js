@@ -32,6 +32,7 @@ window.addEventListener("DOMContentLoaded", () => {
 
     const btnAnalyze = document.getElementById("btn-analyze");
     const btnTuneModel = document.getElementById("btn-tune-model");
+    const selectTunerRatio = document.getElementById("select-tuner-ratio");
     const badgeTunerSamples = document.getElementById("badge-tuner-samples");
     const btnClearStorage = document.getElementById("btn-clear-storage");
     const btnRenderVideo = document.getElementById("btn-render-video");
@@ -761,7 +762,14 @@ window.addEventListener("DOMContentLoaded", () => {
 
                 showProgress("正在基于人工反馈微调 YAMNet 专属分类头...", 50);
 
-                const resp = await fetch("/api/tuner/train", { method: "POST" });
+                const ratioVal = selectTunerRatio ? parseFloat(selectTunerRatio.value) : 6.0;
+                const trainForm = new FormData();
+                trainForm.append("ratio", ratioVal);
+
+                const resp = await fetch("/api/tuner/train", {
+                    method: "POST",
+                    body: trainForm
+                });
                 const res = await resp.json();
                 if (!resp.ok) {
                     throw new Error(res.detail || "训练失败");
