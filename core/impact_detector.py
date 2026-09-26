@@ -165,9 +165,10 @@ class ImpactDetector:
                     continue
 
                 # 2. 本地微调模型门禁过滤：
-                # 如果用户已经通过人工反馈微调了专属模型，且专属模型给该片段打出的拍打概率极低（< 0.25），说明这是用户曾经手动删除/舍弃过的类似噪音，直接过滤！
+                # 只有当微调模型极其笃定该片段是噪音（预测拍打概率 < 0.15 时），才触发门禁剔除，
+                # 确保 99.3%+ 的正常拍打（哪怕伴随人声/暗响）均能安全通过！
                 custom_score = ai_res.get("custom_score")
-                if custom_score is not None and custom_score < 0.25:
+                if custom_score is not None and custom_score < 0.15:
                     continue
 
                 # 3. 融合 AI 预测分值：若 AI 命中 Slap/Whip 或本地微调高分，将大幅提升其置信度

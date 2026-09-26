@@ -117,12 +117,11 @@ class YAMNetTuner:
         X_pos_all = X_all[pos_mask]
         y_pos_all = y_all[pos_mask]
 
-        # 2. 动态配额约束：将进入训练求解器的正样本数量限制在负样本的 2.0 倍以内 (1.5:1 ~ 2:1)
-        max_pos_allowed = int(raw_neg_count * 2.0)
+        # 2. 动态配额约束：提升正样本配额上限至负样本的 5.0 倍 (允许更丰富的拍打声学多样性)
+        max_pos_allowed = int(raw_neg_count * 5.0)
 
         if raw_pos_count > max_pos_allowed:
-            # 采用时间衰减加权均匀采样：兼顾历史多样性与最新的拍打特征
-            # 最近的样本拥有更高的保留概率，同时覆盖旧特征
+            # 采用时间加权均匀采样：兼顾历史多样性与最新的拍打特征
             indices = np.linspace(0, raw_pos_count - 1, max_pos_allowed, dtype=int)
             X_pos = X_pos_all[indices]
             y_pos = y_pos_all[indices]
