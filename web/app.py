@@ -387,6 +387,12 @@ async def get_direct_media(path: str):
     media_types = {
         ".mp4": "video/mp4",
         ".webm": "video/webm",
+        ".mov": "video/quicktime",
+        ".wmv": "video/x-ms-wmv",
+        ".asf": "video/x-ms-asf",
+        ".avi": "video/x-msvideo",
+        ".mkv": "video/x-matroska",
+        ".flv": "video/x-flv",
         ".wav": "audio/wav",
         ".mp3": "audio/mpeg"
     }
@@ -407,6 +413,12 @@ async def get_media_file(folder: str, filename: str):
     media_types = {
         ".mp4": "video/mp4",
         ".webm": "video/webm",
+        ".mov": "video/quicktime",
+        ".wmv": "video/x-ms-wmv",
+        ".asf": "video/x-ms-asf",
+        ".avi": "video/x-msvideo",
+        ".mkv": "video/x-matroska",
+        ".flv": "video/x-flv",
         ".wav": "audio/wav",
         ".mp3": "audio/mpeg"
     }

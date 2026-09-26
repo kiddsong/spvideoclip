@@ -67,11 +67,16 @@ class AudioExtractor:
             raise RuntimeError(f"获取视频元数据失败: {str(e)}")
 
     def is_browser_native(self, video_path: str, info: Dict[str, Any]) -> bool:
-        """判断视频是否能被 Chrome/Edge/Firefox 的 H5 <video> 标签原生直接流畅播放"""
+        """
+        判断视频是否首选原生直接播放：
+        在 Windows 平台环境下，大部分现代浏览器（如 Edge/Chrome 等通过系统媒体扩展）
+        可以直接原生硬解播放 MP4, WebM, MOV 以及 WMV/ASF 视频。
+        """
         ext = os.path.splitext(video_path)[1].lower()
-        if ext == ".mp4" and info.get("v_codec") in ["h264", "avc1"]:
+        if ext in [".mp4", ".webm", ".mov", ".m4v", ".wmv", ".asf"]:
             return True
-        if ext == ".webm" and info.get("v_codec") in ["vp8", "vp9", "av1"]:
+        v_codec = info.get("v_codec", "").lower()
+        if v_codec in ["h264", "avc1", "vp8", "vp9", "av1", "wmv1", "wmv2", "wmv3", "vc1"]:
             return True
         return False
 

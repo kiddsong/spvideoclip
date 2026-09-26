@@ -343,6 +343,26 @@ window.addEventListener("DOMContentLoaded", () => {
                 trimCurTime.innerText = formatTime(curTime);
             }
         });
+
+        // 播放器错误智能接管兜底：
+        // 若浏览器尝试直接播放时抛出不支持错误，且尚未转码，自动触发后台转码无缝切换！
+        playerOriginal.addEventListener("error", () => {
+            if (state.uploadedFile && !state.uploadedFile.is_converted) {
+                console.warn("浏览器原生解码该文件失败，正在自动启动后台 H5 预览转码...");
+                if (transcodingOverlay) {
+                    transcodingOverlay.classList.remove("hidden");
+                }
+                if (playbackStatusBadge) {
+                    playbackStatusBadge.className = "font-mono text-amber-400 flex items-center gap-1.5 font-medium text-[11px]";
+                    playbackStatusBadge.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse"></span><span>正在转换 H5 流...</span>`;
+                }
+                // 请求服务端启动后台备用转码
+                const filename = state.uploadedFile.filename;
+                const baseName = state.uploadedFile.original_name.replace(/\.[^/.]+$/, "");
+                const previewFilename = `preview_${baseName}.mp4`;
+                pollPreviewReady(previewFilename);
+            }
+        });
     }
 
     // 点击“开始识别”
