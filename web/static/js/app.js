@@ -82,12 +82,12 @@ window.addEventListener("DOMContentLoaded", () => {
     }
     if (paramInterval && valInterval) {
         paramInterval.addEventListener("input", (e) => {
-            valInterval.innerText = `${Number(e.target.value).toFixed(2)} 秒`;
+            valInterval.innerText = `${Number(e.target.value).toFixed(2)}s`;
         });
     }
     if (paramPre && valPre) {
         paramPre.addEventListener("input", (e) => {
-            valPre.innerText = `${Number(e.target.value).toFixed(1)} 秒`;
+            valPre.innerText = `${Number(e.target.value).toFixed(1)}s`;
             if (state.uploadedFile && state.events.length > 0) {
                 recalcIntervals();
                 renderEventsList();
@@ -96,7 +96,7 @@ window.addEventListener("DOMContentLoaded", () => {
     }
     if (paramPost && valPost) {
         paramPost.addEventListener("input", (e) => {
-            valPost.innerText = `${Number(e.target.value).toFixed(1)} 秒`;
+            valPost.innerText = `${Number(e.target.value).toFixed(1)}s`;
             if (state.uploadedFile && state.events.length > 0) {
                 recalcIntervals();
                 renderEventsList();
@@ -395,10 +395,7 @@ window.addEventListener("DOMContentLoaded", () => {
     function renderEventsList() {
         if (!eventsList) return;
 
-        if (badgeCount) badgeCount.innerText = `${state.events.length} 个拍打点`;
-        if (statMergedCount) statMergedCount.innerText = state.intervals.length;
-        const totalDuration = state.intervals.reduce((acc, curr) => acc + (curr[1] - curr[0]), 0);
-        if (statTotalDuration) statTotalDuration.innerText = `${totalDuration.toFixed(1)}s`;
+        if (badgeCount) badgeCount.innerText = `${state.events.length} 个片段`;
 
         if (state.events.length === 0) {
             eventsList.innerHTML = `
