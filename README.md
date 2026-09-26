@@ -1,7 +1,7 @@
 # SPVideoClip - SP视频拍打声智能识别与定点剪辑合并系统 (v2.5.0)
 
 <p align="center">
-  <a href="https://github.com/kiddsong/videocli"><img src="https://img.shields.io/badge/GitHub-videocli-blue?logo=github" alt="GitHub Repo"></a>
+  <a href="https://github.com/kiddsong/spvideoclip"><img src="https://img.shields.io/badge/GitHub-spvideoclip-blue?logo=github" alt="GitHub Repo"></a>
   <img src="https://img.shields.io/badge/Python-3.10+-3776AB?logo=python&logoColor=white" alt="Python">
   <img src="https://img.shields.io/badge/FastAPI-0.100+-009688?logo=fastapi&logoColor=white" alt="FastAPI">
   <img src="https://img.shields.io/badge/AI_Engine-Google_YAMNet_(ONNX)-FF6F00?logo=onnx&logoColor=white" alt="YAMNet">
@@ -158,8 +158,8 @@
 
 ### 第一步：克隆代码仓库
 ```bash
-git clone https://github.com/kiddsong/videocli.git
-cd videocli
+git clone https://github.com/kiddsong/spvideoclip.git
+cd spvideoclip
 ```
 
 ### 第二步：创建并激活虚拟环境（推荐）
@@ -232,7 +232,7 @@ http://127.0.0.1:8000
 ## 八、项目目录架构
 
 ```text
-videocli/
+spvideoclip/
 ├── core/
 │   ├── audio_extractor.py       # 视频元数据解析、H5兼容检测与极速预览流转码
 │   ├── impact_detector.py       # 双轨声学瞬态分析与 NMS 候选点检测
