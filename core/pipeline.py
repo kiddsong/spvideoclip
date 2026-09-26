@@ -130,10 +130,10 @@ class VideoPipeline:
     def process_detection(
         self,
         video_filename: str,
-        sensitivity: float = 0.15,
+        sensitivity: float = 1.0,
         pre_seconds: float = 1.2,
         post_seconds: float = 1.2,
-        min_interval_sec: float = 1.5,
+        min_interval_sec: float = 1.0,
         enable_ai: bool = True,
         progress_cb: Optional[Callable[[float, str], None]] = None
     ) -> Dict[str, Any]:

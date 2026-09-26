@@ -411,10 +411,8 @@ window.addEventListener("DOMContentLoaded", () => {
             const isLocked = !!ev.locked;
             const card = document.createElement("div");
 
-            // 卡片样式：若锁定，呈现稳重的琥珀暗金边框与锁定背景
-            card.className = isLocked
-                ? "cursor-pointer select-none flex flex-col justify-between p-3 rounded-xl bg-amber-950/25 border border-amber-500/40 hover:border-amber-400/80 transition-all duration-150 group shadow-md"
-                : "cursor-pointer select-none flex flex-col justify-between p-3 rounded-xl bg-slate-950/70 border border-slate-800 hover:border-rose-500/70 hover:bg-slate-800/80 transition-all duration-150 group shadow-md";
+            // 卡片样式：采用 clip-card 现代轻量玻璃质感，避免傻大笨粗
+            card.className = `clip-card cursor-pointer select-none flex flex-col justify-between p-2.5 rounded-xl transition-all duration-150 group ${isLocked ? 'is-locked ring-1 ring-amber-500/30' : ''}`;
 
             // 点击卡片任意一处均跳转播放
             card.onclick = () => jumpToTime(ev.time);
@@ -422,35 +420,40 @@ window.addEventListener("DOMContentLoaded", () => {
             // 锁按钮的图标状态
             const lockIcon = isLocked
                 ? `<svg class="w-3.5 h-3.5 text-amber-400" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clip-rule="evenodd"/></svg>`
-                : `<svg class="w-3.5 h-3.5 text-slate-500 group-hover:text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z"/></svg>`;
+                : `<svg class="w-3.5 h-3.5 text-slate-400 hover:text-slate-200" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z"/></svg>`;
 
             // “负面”按钮：将该片段标记为负面样本(非拍打噪音)并删除
             const negativeBtn = isLocked
-                ? `<span class="p-1 text-slate-600 cursor-not-allowed opacity-30" title="该片段已锁定，不可操作">
+                ? `<span class="p-1 text-slate-600 cursor-not-allowed opacity-25" title="已锁定">
                      <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                    </span>`
-                : `<button class="p-1 text-slate-500 hover:text-orange-400 hover:bg-slate-700/50 rounded-lg transition" title="标记为负面样本(非拍打噪音)并删除，供AI模型学习" onclick="event.stopPropagation(); markNegative(${idx});">
+                : `<button class="p-1 text-slate-400 hover:text-amber-400 hover:bg-amber-500/10 rounded-md transition" title="标记为负面样本(噪音误报)并删除" onclick="event.stopPropagation(); markNegative(${idx});">
                      <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                    </button>`;
 
             // “删除”按钮：仅删除片段，不加入负面样本
             const deleteBtn = isLocked
-                ? `<span class="p-1 text-slate-600 cursor-not-allowed opacity-30" title="该片段已锁定，不可删除">
+                ? `<span class="p-1 text-slate-600 cursor-not-allowed opacity-25" title="已锁定">
                      <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                    </span>`
-                : `<button class="p-1 text-slate-500 hover:text-rose-400 hover:bg-slate-700/50 rounded-lg transition" title="仅删除片段(不加入负面样本)" onclick="event.stopPropagation(); removeEvent(${idx});">
+                : `<button class="p-1 text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 rounded-md transition" title="仅删除片段(不影响AI模型)" onclick="event.stopPropagation(); removeEvent(${idx});">
                      <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                    </button>`;
 
+            // AI 置信率显示逻辑：只显示一个 AI 置信率
+            const aiScoreVal = (ev.ai_score !== undefined && ev.ai_score !== null)
+                ? (ev.ai_score * 100).toFixed(0)
+                : (ev.confidence * 100).toFixed(0);
+
             card.innerHTML = `
                 <!-- 顶部序列与控制按钮 -->
-                <div class="flex items-center justify-between mb-2">
-                    <span class="w-6 h-6 rounded-lg ${isLocked ? 'bg-amber-500/20 text-amber-300 border-amber-500/30' : 'bg-rose-500/20 text-rose-400 border-rose-500/30 group-hover:bg-rose-500 group-hover:text-white'} text-xs flex items-center justify-center font-bold border transition">
+                <div class="flex items-center justify-between mb-1.5">
+                    <span class="w-5 h-5 rounded-md ${isLocked ? 'bg-amber-500/15 text-amber-300 border border-amber-500/30' : 'bg-white/5 text-slate-300 border border-white/10 group-hover:bg-rose-500/20 group-hover:text-rose-300 group-hover:border-rose-500/30'} text-[10px] flex items-center justify-center font-mono font-bold transition">
                         #${idx + 1}
                     </span>
-                    <div class="flex items-center gap-0.5">
+                    <div class="flex items-center gap-0.5 opacity-75 group-hover:opacity-100 transition">
                         <!-- 锁按钮 -->
-                        <button class="p-1 hover:bg-slate-800/80 rounded-lg transition" title="${isLocked ? '已加锁保护(点击解锁)' : '锁定该片段(不可删除/舍弃)'}" onclick="event.stopPropagation(); toggleLock(${idx});">
+                        <button class="p-1 hover:bg-white/5 rounded-md transition" title="${isLocked ? '已加锁保护(点击解锁)' : '锁定该片段(不可删除/舍弃)'}" onclick="event.stopPropagation(); toggleLock(${idx});">
                             ${lockIcon}
                         </button>
                         <!-- 负面按钮 (加入负面样本并删除) -->
@@ -460,17 +463,14 @@ window.addEventListener("DOMContentLoaded", () => {
                     </div>
                 </div>
 
-                <!-- 拍打发生时间码与置信度 -->
-                <div class="flex items-baseline justify-between mt-1">
-                    <span class="text-base font-mono font-bold ${isLocked ? 'text-amber-200' : 'text-slate-100 group-hover:text-rose-300'} transition">
+                <!-- 拍打发生时间码与唯一定位的 AI 置信率 -->
+                <div class="flex items-baseline justify-between mt-0.5">
+                    <span class="text-sm font-mono font-bold tracking-tight ${isLocked ? 'text-amber-200' : 'text-slate-100 group-hover:text-rose-300'} transition">
                         ${formatTime(ev.time)}
                     </span>
-                    <div class="flex items-center gap-1">
-                        ${ev.ai_score !== undefined && ev.ai_score !== null ? `<span class="text-[9px] font-mono px-1 py-0.2 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30" title="Google YAMNet AI 判定为拍打/抽打的预测概率: ${(ev.ai_score * 100).toFixed(0)}%">AI ${(ev.ai_score * 100).toFixed(0)}%</span>` : ''}
-                        <span class="text-[10px] font-medium px-1.5 py-0.5 rounded ${isLocked ? 'bg-amber-500/10 text-amber-300 border-amber-500/30' : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'}">
-                            ${(ev.confidence * 100).toFixed(0)}%
-                        </span>
-                    </div>
+                    <span class="text-[10px] font-mono font-semibold px-1.5 py-0.5 rounded-full ${isLocked ? 'bg-amber-500/15 text-amber-300 border border-amber-500/25' : 'bg-purple-500/15 text-purple-300 border border-purple-500/25'}" title="Google YAMNet AI 判定为拍打/抽打的预测置信率: ${aiScoreVal}%">
+                        AI ${aiScoreVal}%
+                    </span>
                 </div>
             `;
             eventsList.appendChild(card);

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>VideoClip - 拍打声智能定位与精准切片合并系统</title>
+    <title>SPVideoClip - 智能音频识别与剪辑系统</title>
     <!-- 本地离线样式与脚本 -->
     <script src="/static/js/tailwindcss.js"></script>
     <link rel="stylesheet" href="/static/css/style.css">
@@ -11,57 +11,57 @@
 <body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col font-sans selection:bg-rose-500 selection:text-white">
 
     <!-- 顶部固定导航栏：高度方向对齐，参数一行，功能按钮一行 -->
-    <header class="border-b border-slate-800 bg-slate-900/90 backdrop-blur sticky top-0 z-50 px-6 py-3 shadow-lg">
-        <div class="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <header class="border-b border-white/[0.08] bg-slate-900/80 backdrop-blur-md sticky top-0 z-50 px-6 py-2.5 shadow-xl">
+        <div class="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-3.5">
 
             <!-- 左上角标题与状态指示 -->
             <div class="flex items-center gap-3 shrink-0">
                 <div>
-                    <h1 class="text-2xl font-black tracking-tight text-white leading-none">
-                        VideoClip
+                    <h1 class="text-xl font-extrabold tracking-tight text-white leading-none flex items-center gap-1.5">
+                        <span class="bg-gradient-to-r from-rose-400 via-rose-500 to-amber-400 bg-clip-text text-transparent">SPVideoClip</span>
                     </h1>
-                    <div class="flex items-center gap-1.5 text-[11px] text-slate-400 mt-1.5 font-medium">
-                        <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                        <span>FFmpeg & CUDA 就绪</span>
+                    <div class="flex items-center gap-1.5 text-[10px] text-slate-400 mt-1 font-mono">
+                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                        <span class="tracking-wide">FFmpeg & CUDA 就绪</span>
                     </div>
                 </div>
             </div>
 
             <!-- 右侧两行排布：上行参数，下行功能按钮 -->
-            <div class="flex flex-col gap-2.5 flex-1 md:items-end">
+            <div class="flex flex-col gap-2 flex-1 md:items-end">
 
-                <!-- 第一行：参数设置 (灵敏度、防重叠、拍前、拍后) -->
-                <div class="flex flex-wrap items-center gap-3">
-                    <span class="text-xs font-semibold text-slate-300 flex items-center gap-1 shrink-0">
+                <!-- 第一行：参数设置 (灵敏度=1.00、防重叠=1.00s、拍前=1.2s、拍后=1.2s) -->
+                <div class="flex flex-wrap items-center gap-2.5">
+                    <span class="text-[11px] font-semibold text-slate-400 flex items-center gap-1 shrink-0 uppercase tracking-wider">
                         <svg class="w-3.5 h-3.5 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/>
                         </svg>
                         参数设置:
                     </span>
 
-                    <!-- 灵敏度 -->
-                    <div class="bg-slate-950/60 px-2.5 py-1 rounded-lg border border-slate-800/80 flex items-center gap-2">
+                    <!-- 灵敏度 (默认 1.00) -->
+                    <div class="bg-slate-950/70 px-2.5 py-1 rounded-lg border border-white/[0.08] flex items-center gap-2 hover:border-white/[0.15] transition">
                         <span class="text-[11px] text-slate-400">灵敏度</span>
-                        <input type="range" id="param-sensitivity" min="0.01" max="1.0" step="0.01" value="0.15" class="w-20 accent-rose-500 cursor-pointer">
-                        <span id="val-sensitivity" class="font-mono text-rose-400 font-bold text-xs w-7 text-right">0.15</span>
+                        <input type="range" id="param-sensitivity" min="0.01" max="1.0" step="0.01" value="1.0" class="w-18 accent-rose-500 cursor-pointer">
+                        <span id="val-sensitivity" class="font-mono text-rose-400 font-bold text-xs w-7 text-right">1.00</span>
                     </div>
 
-                    <!-- 防重叠安全间隔 -->
-                    <div class="bg-slate-950/60 px-2.5 py-1 rounded-lg border border-slate-800/80 flex items-center gap-2" title="防重叠安全间隔">
+                    <!-- 防重叠安全间隔 (默认 1.00s) -->
+                    <div class="bg-slate-950/70 px-2.5 py-1 rounded-lg border border-white/[0.08] flex items-center gap-2 hover:border-white/[0.15] transition" title="防重叠安全间隔">
                         <span class="text-[11px] text-slate-400">防重叠</span>
-                        <input type="range" id="param-interval" min="0.2" max="2.0" step="0.05" value="1.50" class="w-20 accent-emerald-500 cursor-pointer">
-                        <span id="val-interval" class="font-mono text-emerald-400 font-bold text-xs w-11 text-right">1.50s</span>
+                        <input type="range" id="param-interval" min="0.2" max="2.0" step="0.05" value="1.0" class="w-18 accent-emerald-500 cursor-pointer">
+                        <span id="val-interval" class="font-mono text-emerald-400 font-bold text-xs w-11 text-right">1.00s</span>
                     </div>
 
-                    <!-- 拍前缓冲 -->
-                    <div class="bg-slate-950/60 px-2.5 py-1 rounded-lg border border-slate-800/80 flex items-center gap-2" title="拍打瞬间向前截取缓冲">
+                    <!-- 拍前缓冲 (默认 1.2s) -->
+                    <div class="bg-slate-950/70 px-2.5 py-1 rounded-lg border border-white/[0.08] flex items-center gap-2 hover:border-white/[0.15] transition" title="拍打瞬间向前截取缓冲">
                         <span class="text-[11px] text-slate-400">拍前</span>
                         <input type="range" id="param-pre" min="0.3" max="3.0" step="0.1" value="1.2" class="w-16 accent-amber-500 cursor-pointer">
                         <span id="val-pre" class="font-mono text-amber-400 font-bold text-xs w-8 text-right">1.2s</span>
                     </div>
 
-                    <!-- 拍后缓冲 -->
-                    <div class="bg-slate-950/60 px-2.5 py-1 rounded-lg border border-slate-800/80 flex items-center gap-2" title="拍打瞬间向后截取缓冲">
+                    <!-- 拍后缓冲 (默认 1.2s) -->
+                    <div class="bg-slate-950/70 px-2.5 py-1 rounded-lg border border-white/[0.08] flex items-center gap-2 hover:border-white/[0.15] transition" title="拍打瞬间向后截取缓冲">
                         <span class="text-[11px] text-slate-400">拍后</span>
                         <input type="range" id="param-post" min="0.3" max="3.0" step="0.1" value="1.2" class="w-16 accent-cyan-500 cursor-pointer">
                         <span id="val-post" class="font-mono text-cyan-400 font-bold text-xs w-8 text-right">1.2s</span>
@@ -69,10 +69,10 @@
                 </div>
 
                 <!-- 第二行：功能按钮，顺序固定为：开始识别 -> Google AI -> 微调训练 -> 清理缓存 -->
-                <div class="flex flex-wrap items-center gap-3">
+                <div class="flex flex-wrap items-center gap-2.5">
 
                     <!-- 1. 开始识别按钮 -->
-                    <button id="btn-analyze" disabled class="px-5 py-1.5 bg-gradient-to-r from-rose-600 to-rose-700 hover:from-rose-500 hover:to-rose-600 disabled:opacity-40 disabled:cursor-not-allowed font-medium text-xs text-white rounded-lg shadow-md shadow-rose-600/30 transition-all flex items-center gap-1.5 shrink-0">
+                    <button id="btn-analyze" disabled class="px-4 py-1.5 bg-gradient-to-r from-rose-600 via-rose-600 to-rose-700 hover:from-rose-500 hover:to-rose-600 disabled:opacity-35 disabled:cursor-not-allowed font-semibold text-xs text-white rounded-lg shadow-md shadow-rose-900/30 transition-all flex items-center gap-1.5 shrink-0 border border-rose-500/30">
                         <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/>
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
@@ -81,16 +81,16 @@
                     </button>
 
                     <!-- 2. Google AI 开关 -->
-                    <label class="bg-slate-950/60 px-3 py-1.5 rounded-lg border border-slate-800/80 flex items-center gap-2 cursor-pointer select-none" title="启用 Google YAMNet 521类深度音频事件分类模型，精准锁定 Slap/Whip 并过滤咳嗽、拍手等噪音">
+                    <label class="bg-slate-950/70 px-2.5 py-1.5 rounded-lg border border-white/[0.08] hover:border-white/[0.15] flex items-center gap-2 cursor-pointer select-none transition" title="启用 Google YAMNet 521类深度音频事件分类模型，精准锁定 Slap/Whip 并过滤咳嗽、拍手等噪音">
                         <span class="text-xs text-slate-300 font-medium">Google AI</span>
                         <input type="checkbox" id="param-ai" checked class="w-3.5 h-3.5 accent-rose-500 rounded cursor-pointer">
-                        <span id="label-ai" class="font-mono text-emerald-400 font-semibold text-xs">已开启</span>
+                        <span id="label-ai" class="font-mono text-emerald-400 font-semibold text-[11px]">已开启</span>
                     </label>
 
                     <!-- 3. 微调训练区 (配比下拉框 + 微调按钮) -->
-                    <div class="flex items-center gap-1.5 bg-slate-950/60 p-0.5 pl-2 rounded-lg border border-purple-500/40">
+                    <div class="flex items-center gap-1.5 bg-slate-950/70 p-0.5 pl-2 rounded-lg border border-purple-500/35 hover:border-purple-500/50 transition">
                         <span class="text-[11px] text-slate-400">配比:</span>
-                        <select id="select-tuner-ratio" class="bg-slate-900 border border-purple-500/40 text-purple-200 text-xs rounded px-1.5 py-0.5 focus:outline-none cursor-pointer">
+                        <select id="select-tuner-ratio" class="bg-slate-900 border border-purple-500/30 text-purple-200 text-xs rounded px-1.5 py-0.5 focus:outline-none cursor-pointer">
                             <option value="3.0">3 : 1</option>
                             <option value="4.0">4 : 1</option>
                             <option value="5.0">5 : 1</option>
@@ -101,17 +101,17 @@
                             <option value="10.0">10 : 1</option>
                             <option value="999.0">全量参与</option>
                         </select>
-                        <button id="btn-tune-model" class="px-2.5 py-1 bg-purple-700 hover:bg-purple-600 text-white rounded text-xs font-medium transition flex items-center gap-1.5 shrink-0" title="基于您对片段的保留/加锁/负面操作，一键微调专属 YAMNet 识别模型">
-                            <svg class="w-3.5 h-3.5 text-purple-200" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <button id="btn-tune-model" class="px-2.5 py-1 bg-purple-600 hover:bg-purple-500 text-white rounded text-xs font-medium transition flex items-center gap-1.5 shrink-0 shadow-sm shadow-purple-900/30" title="基于您对片段的保留/加锁/负面操作，一键微调专属 YAMNet 识别模型">
+                            <svg class="w-3 h-3 text-purple-200" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
                             </svg>
                             <span>微调训练</span>
-                            <span id="badge-tuner-samples" class="text-[10px] px-1.5 rounded-full bg-purple-900/80 text-purple-200 border border-purple-400/30">0</span>
+                            <span id="badge-tuner-samples" class="text-[10px] px-1.5 rounded-full bg-purple-900 text-purple-200 border border-purple-400/30">0</span>
                         </button>
                     </div>
 
                     <!-- 4. 清理缓存按钮 -->
-                    <button id="btn-clear-storage" class="px-3 py-1.5 bg-slate-800/80 hover:bg-rose-500/20 text-slate-400 hover:text-rose-400 rounded-lg border border-slate-700/70 hover:border-rose-500/40 text-xs font-medium transition flex items-center gap-1.5 shrink-0" title="一键清空 uploads 与 audio 临时缓存目录">
+                    <button id="btn-clear-storage" class="px-3 py-1.5 bg-slate-950/70 hover:bg-rose-500/15 text-slate-400 hover:text-rose-300 rounded-lg border border-white/[0.08] hover:border-rose-500/30 text-xs font-medium transition flex items-center gap-1.5 shrink-0" title="一键清空 uploads 与 audio 临时缓存目录">
                         <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                         </svg>
@@ -124,13 +124,13 @@
         </div>
 
         <!-- 进度条（置于 Header 底部） -->
-        <div id="progress-box" class="max-w-7xl mx-auto mt-2 pt-2 border-t border-slate-800/60 hidden">
+        <div id="progress-box" class="max-w-7xl mx-auto mt-2 pt-2 border-t border-white/[0.05] hidden">
             <div class="flex justify-between text-xs mb-1">
                 <span id="progress-label" class="text-slate-400">正在处理...</span>
-                <span id="progress-percent" class="font-mono text-rose-400">0%</span>
+                <span id="progress-percent" class="font-mono text-rose-400 font-bold">0%</span>
             </div>
-            <div class="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
-                <div id="progress-bar" class="bg-gradient-to-r from-rose-500 to-amber-500 h-full w-0 transition-all duration-200"></div>
+            <div class="w-full bg-slate-800/80 h-1 rounded-full overflow-hidden">
+                <div id="progress-bar" class="bg-gradient-to-r from-rose-500 via-amber-500 to-rose-400 h-full w-0 transition-all duration-200"></div>
             </div>
         </div>
     </header>
@@ -142,15 +142,15 @@
         <section class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
 
             <!-- 左侧：上传与原始视频播放一体化区块 (占 5 列) -->
-            <div class="lg:col-span-5 bg-slate-900 border border-slate-800 rounded-2xl p-5 flex flex-col shadow-xl">
+            <div class="lg:col-span-5 glass-panel rounded-2xl p-5 flex flex-col">
 
                 <!-- 头部状态栏 (去掉右上角时间戳显示) -->
                 <div class="flex items-center justify-between mb-3">
-                    <h3 class="text-sm font-semibold text-slate-200 flex items-center gap-2">
-                        <span class="w-2.5 h-2.5 rounded-full bg-blue-500 shadow shadow-blue-500/50"></span> 原始视频
+                    <h3 class="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-2">
+                        <span class="w-2 h-2 rounded-full bg-blue-500 shadow-sm shadow-blue-500/50"></span> 原始视频
                     </h3>
                     <div class="flex items-center gap-3">
-                        <button id="btn-reupload" class="text-xs text-rose-400 hover:text-rose-300 hover:underline hidden flex items-center gap-1">
+                        <button id="btn-reupload" class="text-xs text-rose-400 hover:text-rose-300 hover:underline hidden flex items-center gap-1 transition">
                             <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
                             更换视频
                         </button>
@@ -161,31 +161,31 @@
                 <input type="file" id="video-input" accept="video/*,.rmvb,.rm,.wmv,.asf,.mpg,.mpeg,.mpe,.m2v,.vob,.dat,.avi,.divx,.xvid,.flv,.f4v,.3gp,.ts,.mts" class="hidden">
 
                 <!-- 1. 未上传状态：选择本地文件与路径导入 -->
-                <div id="drop-area" class="border-2 border-dashed border-slate-700 hover:border-rose-500/70 bg-slate-950/60 rounded-xl p-8 text-center cursor-pointer transition-all duration-200 aspect-video flex flex-col items-center justify-center group">
+                <div id="drop-area" class="border border-dashed border-white/[0.12] hover:border-rose-500/60 bg-slate-950/40 rounded-xl p-8 text-center cursor-pointer transition-all duration-200 aspect-video flex flex-col items-center justify-center group">
                     <div class="flex flex-col items-center gap-3 text-slate-400">
-                        <div class="w-12 h-12 rounded-full bg-slate-800/80 group-hover:bg-rose-500/20 group-hover:text-rose-400 flex items-center justify-center text-slate-400 transition">
-                            <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <div class="w-11 h-11 rounded-full bg-white/[0.04] group-hover:bg-rose-500/15 group-hover:text-rose-400 flex items-center justify-center text-slate-400 transition">
+                            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/>
                             </svg>
                         </div>
                         <div>
-                            <button type="button" id="btn-browse-local" class="px-5 py-2 bg-rose-600 hover:bg-rose-500 text-white font-medium text-xs rounded-xl shadow-lg shadow-rose-600/30 transition flex items-center gap-1.5 mx-auto mb-2">
+                            <button type="button" id="btn-browse-local" class="px-4 py-2 bg-gradient-to-r from-rose-600 to-rose-700 hover:from-rose-500 hover:to-rose-600 text-white font-semibold text-xs rounded-xl shadow-lg shadow-rose-950/50 transition flex items-center gap-1.5 mx-auto mb-2 border border-rose-400/20">
                                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122"/></svg>
                                 浏览选择电脑中的视频 (0.1秒秒开)
                             </button>
-                            <span class="text-xs text-slate-400">或直接将视频拖入此处 / 点击浏览文件</span>
+                            <span class="text-xs text-slate-400">或直接将视频拖入此处</span>
                         </div>
-                        <span class="text-[11px] text-slate-500">零网络传输 · 零文件拷贝 · 支持 MP4, MOV, MKV, WMV, RMVB 等全格式</span>
+                        <span class="text-[11px] text-slate-500 font-mono">零网络传输 · 零文件拷贝 · 支持 MP4, MOV, MKV, WMV, RMVB 等全格式</span>
                     </div>
                 </div>
 
                 <!-- 2. 已上传状态：视频播放器视窗 -->
-                <div id="player-container" class="bg-black rounded-xl overflow-hidden aspect-video flex items-center justify-center border border-slate-800 hidden relative">
+                <div id="player-container" class="bg-black rounded-xl overflow-hidden aspect-video flex items-center justify-center border border-white/[0.08] hidden relative shadow-inner">
                     <video id="player-original" controls class="w-full h-full object-contain"></video>
 
                     <!-- 转码中的覆盖状态浮层 (包含动态百分比与进度条) -->
                     <div id="transcoding-overlay" class="absolute inset-0 bg-slate-950/85 backdrop-blur-sm flex flex-col items-center justify-center text-center p-6 gap-3.5 hidden z-10">
-                        <div class="w-10 h-10 border-3 border-amber-500/30 border-t-amber-500 rounded-full animate-spin"></div>
+                        <div class="w-9 h-9 border-2 border-amber-500/20 border-t-amber-400 rounded-full animate-spin"></div>
                         <div class="w-full max-w-xs space-y-2">
                             <div class="flex items-center justify-between text-xs">
                                 <span class="font-semibold text-amber-300">正在生成 H5 预览画面...</span>
@@ -196,7 +196,7 @@
                                 <div id="transcode-progress-bar" class="bg-gradient-to-r from-amber-500 to-rose-500 h-full w-0 transition-all duration-300"></div>
                             </div>
                             <p id="transcode-msg" class="text-[10px] text-slate-400 font-mono">正在启动 FFmpeg 硬件加速转码...</p>
-                            <p class="text-[11px] text-slate-400 pt-1 border-t border-slate-800/80">
+                            <p class="text-[11px] text-slate-400 pt-1 border-t border-white/[0.06]">
                                 提示：拍打声识别已就绪，您现在即可点击右上角<b>【开始识别】</b>，无需等待画面转码！
                             </p>
                         </div>
@@ -204,9 +204,9 @@
                 </div>
 
                 <!-- 批量裁剪/舍弃控制栏 (时间点前后批量删除) -->
-                <div id="batch-trim-panel" class="mt-3 p-3 rounded-xl bg-slate-950/70 border border-slate-800/80 hidden">
+                <div id="batch-trim-panel" class="mt-3 p-3 rounded-xl bg-slate-950/60 border border-white/[0.06] hidden">
                     <div class="flex items-center justify-between text-xs text-slate-300 mb-2">
-                        <span class="font-medium flex items-center gap-1.5 text-slate-200">
+                        <span class="font-semibold flex items-center gap-1.5 text-slate-200">
                             <svg class="w-3.5 h-3.5 text-rose-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.121 14.121L19 19m-7-7l7-7m-7 7l-2.879 2.879M12 12L9.121 9.121m0 5.758a3 3 0 10-4.243 4.243 3 3 0 004.243-4.243zm0-5.758a3 3 0 10-4.243-4.243 3 3 0 004.243 4.243z"/>
                             </svg>
@@ -215,20 +215,20 @@
                         <span class="text-[11px] text-slate-400 font-mono">基准点: <b id="trim-cur-time" class="text-rose-400">00:00.0</b></span>
                     </div>
                     <div class="grid grid-cols-2 gap-2">
-                        <button id="btn-discard-before" class="px-2.5 py-1.5 bg-slate-900 hover:bg-rose-500/20 text-slate-300 hover:text-rose-300 rounded-lg border border-slate-700/80 hover:border-rose-500/40 text-xs transition flex items-center justify-center gap-1" title="舍弃当前播放时间点之前的所有未锁定片段">
+                        <button id="btn-discard-before" class="px-2.5 py-1.5 bg-white/[0.03] hover:bg-rose-500/15 text-slate-300 hover:text-rose-300 rounded-lg border border-white/[0.08] hover:border-rose-500/30 text-xs transition flex items-center justify-center gap-1" title="舍弃当前播放时间点之前的所有未锁定片段">
                             <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 19l-7-7 7-7m8 14l-7-7 7-7"/></svg>
                             舍弃当前时间点之前
                         </button>
-                        <button id="btn-discard-after" class="px-2.5 py-1.5 bg-slate-900 hover:bg-rose-500/20 text-slate-300 hover:text-rose-300 rounded-lg border border-slate-700/80 hover:border-rose-500/40 text-xs transition flex items-center justify-center gap-1" title="舍弃当前播放时间点之后的所有未锁定片段">
+                        <button id="btn-discard-after" class="px-2.5 py-1.5 bg-white/[0.03] hover:bg-rose-500/15 text-slate-300 hover:text-rose-300 rounded-lg border border-white/[0.08] hover:border-rose-500/30 text-xs transition flex items-center justify-center gap-1" title="舍弃当前播放时间点之后的所有未锁定片段">
                             舍弃当前时间点之后
                             <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 5l7 7-7 7M5 5l7 7-7 7"/></svg>
                         </button>
                     </div>
-                    <p class="text-[10px] text-slate-500 mt-1.5">提示：拖动播放器进度条至指定时刻，即可一键剔除该时间点之前或之后的所有无效拍打（已加锁的片段受保护不会被舍弃）。</p>
+                    <p class="text-[10px] text-slate-500 mt-1.5 leading-relaxed">提示：拖动播放器进度条至指定时刻，即可一键剔除该时间点之前或之后的所有无效拍打（已加锁的片段受保护不会被舍弃）。</p>
                 </div>
 
                 <!-- 视频基础信息 -->
-                <div id="video-file-info" class="mt-4 pt-3.5 border-t border-slate-800/80 text-xs space-y-1.5 hidden">
+                <div id="video-file-info" class="mt-4 pt-3.5 border-t border-white/[0.06] text-xs space-y-1.5 hidden">
                     <div class="flex justify-between text-slate-300">
                         <span class="text-slate-500">视频文件:</span>
                         <span id="info-filename" class="font-mono truncate max-w-[240px] text-slate-200">--</span>
@@ -243,7 +243,7 @@
                     </div>
                     <div class="flex justify-between items-center text-slate-300 pt-0.5">
                         <span class="text-slate-500">播放器状态:</span>
-                        <span id="playback-status-badge" class="font-mono text-emerald-400 flex items-center gap-1.5 font-medium">
+                        <span id="playback-status-badge" class="font-mono text-emerald-400 flex items-center gap-1.5 font-medium text-[11px]">
                             <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
                             <span>原生支持播放</span>
                         </span>
@@ -260,23 +260,23 @@
             </div>
 
             <!-- 右侧：拍打声识别片段列表 (只显示当前片段数，不显示截取段数和时长) -->
-            <div class="lg:col-span-7 bg-slate-900 border border-slate-800 rounded-2xl p-5 flex flex-col shadow-xl min-h-[420px]">
+            <div class="lg:col-span-7 glass-panel rounded-2xl p-5 flex flex-col min-h-[460px]">
 
                 <!-- 顶部操作栏与统计指标 -->
-                <div class="flex flex-wrap items-center justify-between gap-3 mb-3 pb-3 border-b border-slate-800">
+                <div class="flex flex-wrap items-center justify-between gap-3 mb-3.5 pb-3 border-b border-white/[0.06]">
                     <div class="flex items-center gap-2.5 flex-wrap">
-                        <h3 class="text-sm font-semibold text-slate-200 flex items-center gap-2">
-                            <span class="w-2.5 h-2.5 rounded-full bg-rose-500 shadow shadow-rose-500/50"></span> 识别片段列表
+                        <h3 class="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-2">
+                            <span class="w-2 h-2 rounded-full bg-rose-500 shadow-sm shadow-rose-500/50"></span> 识别片段列表
                         </h3>
-                        <span id="badge-count" class="px-2.5 py-0.5 rounded-full text-xs bg-rose-500/20 text-rose-400 border border-rose-500/30 font-medium">0 个片段</span>
+                        <span id="badge-count" class="px-2 py-0.5 rounded-full text-[11px] bg-rose-500/15 text-rose-400 border border-rose-500/25 font-mono font-medium">0 个片段</span>
                     </div>
                     <div class="flex items-center gap-2">
-                        <button id="btn-open-dir" class="text-xs text-emerald-400 hover:text-emerald-300 bg-emerald-500/10 hover:bg-emerald-500/20 px-3 py-1.5 rounded-xl border border-emerald-500/30 font-medium hidden flex items-center gap-1.5 transition">
+                        <button id="btn-open-dir" class="text-xs text-emerald-400 hover:text-emerald-300 bg-emerald-500/10 hover:bg-emerald-500/20 px-3 py-1.5 rounded-lg border border-emerald-500/25 font-medium hidden flex items-center gap-1.5 transition">
                             <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 19a2 2 0 01-2-2V7a2 2 0 012-2h4l2 2h4a2 2 0 012 2v1M5 19h14a2 2 0 002-2v-5a2 2 0 00-2-2H9a2 2 0 00-2 2v5a2 2 0 01-2 2z"/></svg>
-                            打开保存目录 (D:\videocliout)
+                            打开目录 (D:\videocliout)
                         </button>
-                        <button id="btn-render-video" disabled class="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 disabled:cursor-not-allowed text-xs font-medium text-white rounded-xl shadow-lg shadow-emerald-600/30 transition-all flex items-center gap-1.5">
-                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2"/></svg>
+                        <button id="btn-render-video" disabled class="px-3.5 py-1.5 bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-500 hover:to-emerald-600 disabled:opacity-35 disabled:cursor-not-allowed text-xs font-semibold text-white rounded-lg shadow-sm shadow-emerald-900/30 transition-all flex items-center gap-1.5 border border-emerald-400/25">
+                            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2"/></svg>
                             合并并保存
                         </button>
                     </div>
@@ -289,9 +289,9 @@
                 </div>
 
                 <!-- 极简片段卡片容器 (横向网格流动排列) -->
-                <div id="events-list" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5 max-h-[480px] overflow-y-auto p-1">
-                    <div class="col-span-full text-center py-20 text-slate-600 text-xs">
-                        请在左侧上传视频并点击顶部“开始识别”，识别到的片段卡片将在此横向排列展示
+                <div id="events-list" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5 max-h-[520px] overflow-y-auto p-1">
+                    <div class="col-span-full text-center py-24 text-slate-500 text-xs">
+                        请在左侧选择视频并点击顶部“开始识别”，识别到的片段卡片将在此横向排列展示
                     </div>
                 </div>
             </div>
@@ -301,11 +301,11 @@
     </main>
 
     <!-- 底部状态声明 -->
-    <footer class="mt-auto border-t border-slate-800 py-3 px-6 text-center text-xs text-slate-600">
-        VideoClip 拍打声智能音频识别与剪辑系统 &bull; 基于 Librosa 声学特征分析与 FFmpeg 硬件加速
+    <footer class="mt-auto border-t border-white/[0.06] py-3.5 px-6 text-center text-[11px] text-slate-400 font-mono">
+        SPVideoClip智能音频识别与剪辑系统 v2.5.0 &bull; 基于物理声学瞬态分析与 Google YAMNet 深度AI事件识别
     </footer>
 
     <!-- 业务逻辑脚本 (加版本号避免浏览器304旧缓存) -->
-    <script src="/static/js/app.js?v=17.0"></script>
+    <script src="/static/js/app.js?v=18.0"></script>
 </body>
 </html>

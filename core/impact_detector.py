@@ -21,8 +21,8 @@ class ImpactDetector:
     def detect_impacts(
         self,
         audio_path: str,
-        sensitivity: float = 0.15,     # 灵敏度 0.01 ~ 1.0 (越大约敏感)
-        min_interval_sec: float = 1.5,  # 两次独立有效拍打之间的最小安全间隔 (默认 1.5 秒，排除余震抖动与二次触发)
+        sensitivity: float = 1.0,      # 默认灵敏度 1.0
+        min_interval_sec: float = 1.0,  # 默认防重叠间隔 1.0 秒
         min_rms_db: float = -35.0,      # 绝对底噪截断 (dB)
         enable_ai: bool = True          # 是否开启 Google YAMNet 深度语义过滤
     ) -> List[Dict[str, Any]]:

@@ -97,10 +97,10 @@ async def upload_video(file: UploadFile = File(...)):
 async def analyze_video(
     background_tasks: BackgroundTasks,
     video_filename: str = Form(...),
-    sensitivity: float = Form(0.15),
+    sensitivity: float = Form(1.0),
     pre_seconds: float = Form(1.2),
     post_seconds: float = Form(1.2),
-    min_interval: float = Form(1.5),
+    min_interval: float = Form(1.0),
     enable_ai: bool = Form(True)
 ):
     """发起拍打声识别异步分析 (支持 Google YAMNet 深度事件识别)"""
