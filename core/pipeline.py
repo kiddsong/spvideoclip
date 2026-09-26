@@ -206,33 +206,26 @@ class VideoPipeline:
 
         # 命名格式规范：Merge_原文件名.mp4
         output_filename = f"Merge_{base_name}.mp4"
-        output_path = os.path.join(self.output_dir, output_filename)
+
+        # 确定最终导出目录（优先使用用户自定义路径，默认使用 D:\videocliout）
+        target_export_dir = custom_export_dir if custom_export_dir and os.path.isabs(custom_export_dir) else self.export_dir
+        os.makedirs(target_export_dir, exist_ok=True)
+        export_file_path = os.path.join(target_export_dir, output_filename)
 
         def cutter_cb(curr, total, msg):
             if progress_cb:
                 ratio = 0.1 + 0.85 * (curr / max(1, total))
                 progress_cb(round(ratio, 2), msg)
 
+        # 直接输出到最终目标目录，不再在 storage/outputs 中冗余存放与重复复制！
         self.cutter.cut_and_concat(
             input_video=video_path,
             intervals=intervals,
-            output_video=output_path,
+            output_video=export_file_path,
             progress_callback=cutter_cb
         )
 
-        output_info = self.audio_extractor.get_video_info(output_path)
-
-        # 确定最终导出目录（优先使用用户自定义路径，默认使用 D:\videocliout）
-        target_export_dir = custom_export_dir if custom_export_dir and os.path.isabs(custom_export_dir) else self.export_dir
-        os.makedirs(target_export_dir, exist_ok=True)
-
-        export_file_path = os.path.join(target_export_dir, output_filename)
-        try:
-            shutil.copy2(output_path, export_file_path)
-            export_saved = True
-        except Exception as e:
-            export_saved = False
-            export_file_path = f"保存失败: {str(e)}"
+        output_info = self.audio_extractor.get_video_info(export_file_path)
 
         if progress_cb: progress_cb(1.0, f"成片已生成并自动保存至 {target_export_dir}！")
 
@@ -242,5 +235,5 @@ class VideoPipeline:
             "size_bytes": output_info["size_bytes"],
             "export_dir": target_export_dir,
             "export_file_path": export_file_path,
-            "export_saved": export_saved
+            "export_saved": True
         }

@@ -228,11 +228,11 @@ async def open_output_folder(folder: Optional[str] = Form(None)):
 
 @app.post("/api/clear-storage")
 async def clear_temp_storage():
-    """一键清理 uploads 和 audio 临时存储目录中的所有文件"""
+    """一键清理 uploads、audio 以及历史 outputs 临时存储目录中的残留文件"""
     deleted_count = 0
     freed_bytes = 0
 
-    for folder in [pipeline.upload_dir, pipeline.audio_dir]:
+    for folder in [pipeline.upload_dir, pipeline.audio_dir, pipeline.output_dir]:
         if not os.path.exists(folder):
             continue
         for item in os.listdir(folder):
