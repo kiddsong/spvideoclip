@@ -426,12 +426,21 @@ window.addEventListener("DOMContentLoaded", () => {
                 ? `<svg class="w-3.5 h-3.5 text-amber-400" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clip-rule="evenodd"/></svg>`
                 : `<svg class="w-3.5 h-3.5 text-slate-500 group-hover:text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z"/></svg>`;
 
-            // 删除按钮：若已锁定，不可删除（禁用置灰或隐藏）
+            // “负面”按钮：将该片段标记为负面样本(非拍打噪音)并删除
+            const negativeBtn = isLocked
+                ? `<span class="p-1 text-slate-600 cursor-not-allowed opacity-30" title="该片段已锁定，不可操作">
+                     <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                   </span>`
+                : `<button class="p-1 text-slate-500 hover:text-orange-400 hover:bg-slate-700/50 rounded-lg transition" title="标记为负面样本(非拍打噪音)并删除，供AI模型学习" onclick="event.stopPropagation(); markNegative(${idx});">
+                     <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                   </button>`;
+
+            // “删除”按钮：仅删除片段，不加入负面样本
             const deleteBtn = isLocked
-                ? `<span class="p-1 text-slate-600 cursor-not-allowed opacity-40" title="该片段已锁定，不可删除">
+                ? `<span class="p-1 text-slate-600 cursor-not-allowed opacity-30" title="该片段已锁定，不可删除">
                      <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                    </span>`
-                : `<button class="p-1 text-slate-500 hover:text-rose-400 hover:bg-slate-700/50 rounded-lg transition" title="剔除该误判点" onclick="event.stopPropagation(); removeEvent(${idx});">
+                : `<button class="p-1 text-slate-500 hover:text-rose-400 hover:bg-slate-700/50 rounded-lg transition" title="仅删除片段(不加入负面样本)" onclick="event.stopPropagation(); removeEvent(${idx});">
                      <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                    </button>`;
 
@@ -441,12 +450,14 @@ window.addEventListener("DOMContentLoaded", () => {
                     <span class="w-6 h-6 rounded-lg ${isLocked ? 'bg-amber-500/20 text-amber-300 border-amber-500/30' : 'bg-rose-500/20 text-rose-400 border-rose-500/30 group-hover:bg-rose-500 group-hover:text-white'} text-xs flex items-center justify-center font-bold border transition">
                         #${idx + 1}
                     </span>
-                    <div class="flex items-center gap-1">
+                    <div class="flex items-center gap-0.5">
                         <!-- 锁按钮 -->
-                        <button class="p-1 hover:bg-slate-800/80 rounded-lg transition" title="${isLocked ? '已加锁保护(点击解锁)' : '锁定该片段(不可删除)'}" onclick="event.stopPropagation(); toggleLock(${idx});">
+                        <button class="p-1 hover:bg-slate-800/80 rounded-lg transition" title="${isLocked ? '已加锁保护(点击解锁)' : '锁定该片段(不可删除/舍弃)'}" onclick="event.stopPropagation(); toggleLock(${idx});">
                             ${lockIcon}
                         </button>
-                        <!-- 删除按钮 -->
+                        <!-- 负面按钮 (加入负面样本并删除) -->
+                        ${negativeBtn}
+                        <!-- 删除按钮 (仅删除不加入负样本) -->
                         ${deleteBtn}
                     </div>
                 </div>
@@ -521,7 +532,7 @@ window.addEventListener("DOMContentLoaded", () => {
         playerOriginal.play();
     };
 
-    // 移除单项并动态重新计算合并区间 (防误删：被锁定的片段拒绝删除；删除视为【负样本】采集)
+    // 仅删除单项：纯粹移除片段，不作为负面样本记录
     window.removeEvent = function(index) {
         if (!state.events[index]) return;
         if (state.events[index].locked) {
@@ -529,8 +540,22 @@ window.addEventListener("DOMContentLoaded", () => {
             return;
         }
 
+        // 仅从列表中移除片段，不提交任何负样本反馈
+        state.events.splice(index, 1);
+        recalcIntervals();
+        renderEventsList();
+    };
+
+    // 标记为负面样本并删除：明确属于噪音误报，提交给AI模型学习排除
+    window.markNegative = function(index) {
+        if (!state.events[index]) return;
+        if (state.events[index].locked) {
+            alert("该片段已被锁定保护，无法操作！如需标记负面请先点击锁图标解锁。");
+            return;
+        }
+
         const removed = state.events[index];
-        // 自动将用户剔除的片段作为【负样本】采集学习
+        // 明确将该片段作为【负样本】采集学习
         if (removed && removed.embedding) {
             submitFeedback([{
                 embedding: removed.embedding,
@@ -543,7 +568,7 @@ window.addEventListener("DOMContentLoaded", () => {
         renderEventsList();
     };
 
-    // 批量舍弃：舍弃当前时间点之前的所有未锁定片段 (自动批量采集为负样本)
+    // 批量舍弃：舍弃当前时间点之前的所有未锁定片段 (仅裁剪丢弃，不加入负面样本)
     if (btnDiscardBefore) {
         btnDiscardBefore.addEventListener("click", () => {
             if (!playerOriginal || state.events.length === 0) return;
@@ -555,15 +580,8 @@ window.addEventListener("DOMContentLoaded", () => {
                 return;
             }
 
-            const confirmed = confirm(`确定要舍弃 ${formatTime(curTime)} 之前的所有未锁定片段吗？\n共将移除 ${toRemove.length} 个片段。已锁定的片段将保留。`);
+            const confirmed = confirm(`确定要舍弃 ${formatTime(curTime)} 之前的所有未锁定片段吗？\n共将移除 ${toRemove.length} 个片段（仅删除，不计入负面样本库）。已锁定的片段将保留。`);
             if (!confirmed) return;
-
-            // 批量将剔除的片段作为负样本收集
-            const negItems = toRemove.filter(it => it.embedding).map(it => ({
-                embedding: it.embedding,
-                label: 0
-            }));
-            submitFeedback(negItems);
 
             state.events = state.events.filter(ev => ev.time >= curTime || ev.locked);
             recalcIntervals();
@@ -571,7 +589,7 @@ window.addEventListener("DOMContentLoaded", () => {
         });
     }
 
-    // 批量舍弃：舍弃当前时间点之后的所有未锁定片段 (自动批量采集为负样本)
+    // 批量舍弃：舍弃当前时间点之后的所有未锁定片段 (仅裁剪丢弃，不加入负面样本)
     if (btnDiscardAfter) {
         btnDiscardAfter.addEventListener("click", () => {
             if (!playerOriginal || state.events.length === 0) return;
@@ -583,15 +601,8 @@ window.addEventListener("DOMContentLoaded", () => {
                 return;
             }
 
-            const confirmed = confirm(`确定要舍弃 ${formatTime(curTime)} 之后的所有未锁定片段吗？\n共将移除 ${toRemove.length} 个片段。已锁定的片段将保留。`);
+            const confirmed = confirm(`确定要舍弃 ${formatTime(curTime)} 之后的所有未锁定片段吗？\n共将移除 ${toRemove.length} 个片段（仅删除，不计入负面样本库）。已锁定的片段将保留。`);
             if (!confirmed) return;
-
-            // 批量将剔除的片段作为负样本收集
-            const negItems = toRemove.filter(it => it.embedding).map(it => ({
-                embedding: it.embedding,
-                label: 0
-            }));
-            submitFeedback(negItems);
 
             state.events = state.events.filter(ev => ev.time <= curTime || ev.locked);
             recalcIntervals();
