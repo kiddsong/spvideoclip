@@ -162,8 +162,6 @@ window.addEventListener("DOMContentLoaded", () => {
 
     // 解法一：直接就地读取电脑本地文件，零网络传输、零拷贝，0.1秒秒开！
     async function handleSelectLocalFile(specifiedPath = null) {
-        showProgress("正在快速加载本地文件...", 50);
-
         try {
             const formData = new FormData();
             if (specifiedPath) {
@@ -177,7 +175,6 @@ window.addEventListener("DOMContentLoaded", () => {
 
             const data = await resp.json();
             if (data.status === "cancelled") {
-                hideProgress();
                 return;
             }
 
@@ -188,7 +185,6 @@ window.addEventListener("DOMContentLoaded", () => {
             applyLoadedVideo(data);
         } catch (error) {
             alert("选择本地文件出错: " + error.message);
-            hideProgress();
         }
     }
 
@@ -257,9 +253,12 @@ window.addEventListener("DOMContentLoaded", () => {
     // 轮询预览流是否转码就绪并更新精确百分比进度
     function pollPreviewReady(previewFilename) {
         let count = 0;
+        let isPolling = false;
         const timer = setInterval(async () => {
+            if (isPolling) return; // 避免网络请求堆积
+            isPolling = true;
             count++;
-            if (count > 200) { // 最多轮询 300 秒
+            if (count > 600) { // 最多轮询 180 秒 (300ms * 600)
                 clearInterval(timer);
                 return;
             }
@@ -267,8 +266,8 @@ window.addEventListener("DOMContentLoaded", () => {
                 const resp = await fetch(`/api/preview-status/${encodeURIComponent(previewFilename)}`);
                 const res = await resp.json();
 
-                // 实时更新浮层和参数栏的百分比进度
-                const percent = Math.round((res.progress || 0) * 100);
+                // 实时平滑更新浮层和参数栏的百分比进度
+                const percent = Math.min(100, Math.round((res.progress || 0) * 100));
                 if (transcodePercent) {
                     transcodePercent.innerText = `${percent}%`;
                 }
@@ -284,16 +283,24 @@ window.addEventListener("DOMContentLoaded", () => {
 
                 if (res.ready) {
                     clearInterval(timer);
+                    if (transcodePercent) {
+                        transcodePercent.innerText = "100%";
+                    }
+                    if (transcodeProgressBar) {
+                        transcodeProgressBar.style.width = "100%";
+                    }
                     if (playerOriginal) {
                         const cur = playerOriginal.currentTime || 0;
                         playerOriginal.src = res.url;
                         playerOriginal.load();
                         playerOriginal.currentTime = cur;
                     }
-                    // 隐藏转码遮罩浮层
-                    if (transcodingOverlay) {
-                        transcodingOverlay.classList.add("hidden");
-                    }
+                    // 稍作停顿平滑隐藏转码遮罩浮层
+                    setTimeout(() => {
+                        if (transcodingOverlay) {
+                            transcodingOverlay.classList.add("hidden");
+                        }
+                    }, 250);
                     // 更新状态徽章为就绪
                     if (playbackStatusBadge) {
                         playbackStatusBadge.className = "font-mono text-emerald-400 flex items-center gap-1.5 font-medium";
@@ -305,8 +312,11 @@ window.addEventListener("DOMContentLoaded", () => {
                         }
                     }
                 }
-            } catch (e) {}
-        }, 1000);
+            } catch (e) {
+            } finally {
+                isPolling = false;
+            }
+        }, 300);
     }
 
     // 处理传统文件上传 (复用统一的 applyLoadedVideo 渲染)

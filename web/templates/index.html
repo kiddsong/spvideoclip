@@ -193,7 +193,7 @@
                             </div>
                             <!-- 进度条 -->
                             <div class="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
-                                <div id="transcode-progress-bar" class="bg-gradient-to-r from-amber-500 to-rose-500 h-full w-0 transition-all duration-300"></div>
+                                <div id="transcode-progress-bar" class="bg-gradient-to-r from-amber-500 to-rose-500 h-full w-0 transition-all duration-300 ease-out"></div>
                             </div>
                             <p id="transcode-msg" class="text-[10px] text-slate-400 font-mono">正在启动 FFmpeg 硬件加速转码...</p>
                             <p class="text-[11px] text-slate-400 pt-1 border-t border-white/[0.06]">
@@ -313,6 +313,6 @@
     </footer>
 
     <!-- 业务逻辑脚本 (加版本号避免浏览器304旧缓存) -->
-    <script src="/static/js/app.js?v=22.0"></script>
+    <script src="/static/js/app.js?v=23.0"></script>
 </body>
 </html>

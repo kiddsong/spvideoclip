@@ -68,15 +68,22 @@ class AudioExtractor:
 
     def is_browser_native(self, video_path: str, info: Dict[str, Any]) -> bool:
         """
-        判断视频是否首选原生直接播放：
-        在 Windows 平台环境下，大部分现代浏览器（如 Edge/Chrome 等通过系统媒体扩展）
-        可以直接原生硬解播放 MP4, WebM, MOV 以及 WMV/ASF 视频。
+        判断视频是否能被 Chrome/Edge/Firefox 的 H5 <video> 标签原生直接流畅播放。
+        现代浏览器原生支持的主要是 MP4 (H.264+AAC/MP3) 和 WebM (VP8/VP9/AV1)。
+        所有老旧格式（WMV, ASF, RM, RMVB, AVI, MKV, FLV 等）或非 H.264 编码均自动启动后台轻量 H5 预览流转码。
         """
         ext = os.path.splitext(video_path)[1].lower()
-        if ext in [".mp4", ".webm", ".mov", ".m4v", ".wmv", ".asf"]:
-            return True
         v_codec = info.get("v_codec", "").lower()
-        if v_codec in ["h264", "avc1", "vp8", "vp9", "av1", "wmv1", "wmv2", "wmv3", "vc1"]:
+        a_codec = info.get("a_codec", "").lower()
+
+        # MP4 / M4V 且视频编码为 H.264
+        if ext in [".mp4", ".m4v"] and v_codec in ["h264", "avc1"]:
+            return True
+        # WebM 且 VP8 / VP9 / AV1
+        if ext == ".webm" and v_codec in ["vp8", "vp9", "av1"]:
+            return True
+        # QuickTime MOV 且 H.264 配合标准音频
+        if ext == ".mov" and v_codec in ["h264", "avc1"] and a_codec in ["aac", "mp3", ""]:
             return True
         return False
 
@@ -202,7 +209,10 @@ class AudioExtractor:
                         ratio = min(0.99, max(0.01, current_sec / total_duration))
                         percent = int(ratio * 100)
                         if progress_callback:
-                            progress_callback(ratio, f"正在转换 480p 极速预览画面: {percent}% ({current_sec:.1f}s / {total_duration:.1f}s)")
+                            msg = f"正在转换 480p 极速预览画面: {percent}% ({current_sec:.1f}s / {total_duration:.1f}s)"
+                            if percent >= 98:
+                                msg = f"正在封装写入 Web 兼容流: {percent}%"
+                            progress_callback(ratio, msg)
                     except Exception:
                         pass
                 elif line.startswith("progress=end"):
