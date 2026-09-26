@@ -81,23 +81,26 @@ input[type="range"]:active::-webkit-slider-thumb {
     box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
 }
 
-/* 片段小卡片精致微阴影与流光动效 */
+/* 片段小卡片精致微阴影与流光动效 (显著提升与大背景的区分度) */
 .clip-card {
     transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
-    background: rgba(15, 21, 32, 0.6);
-    border: 1px solid rgba(255, 255, 255, 0.06);
+    background: #111827; /* 采用饱满的深灰蓝底色，清晰从底板脱出 */
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    box-shadow: 0 4px 12px -2px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
 .clip-card:hover {
-    transform: translateY(-1.5px);
-    border-color: rgba(244, 63, 94, 0.35);
-    background: rgba(24, 32, 47, 0.85);
-    box-shadow: 0 6px 20px -4px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(244, 63, 94, 0.2);
+    transform: translateY(-2px);
+    border-color: rgba(244, 63, 94, 0.6);
+    background: #1e2638;
+    box-shadow: 0 8px 24px -4px rgba(0, 0, 0, 0.75), 0 0 0 1px rgba(244, 63, 94, 0.35);
 }
 .clip-card.is-locked {
-    background: rgba(40, 26, 12, 0.45);
-    border-color: rgba(245, 158, 11, 0.35);
+    background: #23190e;
+    border-color: rgba(245, 158, 11, 0.5);
+    box-shadow: 0 4px 12px -2px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(245, 158, 11, 0.15);
 }
 .clip-card.is-locked:hover {
-    border-color: rgba(245, 158, 11, 0.6);
-    box-shadow: 0 6px 20px -4px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(245, 158, 11, 0.25);
+    border-color: rgba(245, 158, 11, 0.85);
+    background: #2e2013;
+    box-shadow: 0 8px 24px -4px rgba(0, 0, 0, 0.75), 0 0 0 1px rgba(245, 158, 11, 0.4);
 }

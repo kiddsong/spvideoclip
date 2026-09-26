@@ -55,6 +55,12 @@ window.addEventListener("DOMContentLoaded", () => {
     const btnOpenDir = document.getElementById("btn-open-dir");
     const saveLocationTag = document.getElementById("save-location-tag");
 
+    const btnMergeSuccess = document.getElementById("btn-merge-success");
+    const mergeSuccessText = document.getElementById("merge-success-text");
+    const btnChangeExportDir = document.getElementById("btn-change-export-dir");
+    const labelExportDir = document.getElementById("label-export-dir");
+    let currentCustomExportDir = "D:\\videocliout"; // 默认保存目录
+
     const batchTrimPanel = document.getElementById("batch-trim-panel");
     const trimCurTime = document.getElementById("trim-cur-time");
     const btnDiscardBefore = document.getElementById("btn-discard-before");
@@ -638,10 +644,36 @@ window.addEventListener("DOMContentLoaded", () => {
         if (btnRenderVideo) btnRenderVideo.disabled = (state.intervals.length === 0);
     }
 
+    // 手动选取成片保存目录
+    if (btnChangeExportDir) {
+        btnChangeExportDir.addEventListener("click", async () => {
+            try {
+                showProgress("正在选取目标文件夹...", 30);
+                const resp = await fetch("/api/select-export-dir", { method: "POST" });
+                const data = await resp.json();
+                hideProgress();
+
+                if (data.status === "success" && data.export_dir) {
+                    currentCustomExportDir = data.export_dir;
+                    if (labelExportDir) {
+                        labelExportDir.innerText = currentCustomExportDir;
+                        labelExportDir.title = currentCustomExportDir;
+                    }
+                }
+            } catch (e) {
+                hideProgress();
+                alert("选取文件夹出错: " + e.message);
+            }
+        });
+    }
+
     // 点击“合并并保存” (自动将最终保留的片段作为【正样本】学习巩固)
     if (btnRenderVideo) {
         btnRenderVideo.addEventListener("click", async () => {
             if (!state.uploadedFile || state.intervals.length === 0) return;
+
+            // 隐藏旧的成功说明
+            if (btnMergeSuccess) btnMergeSuccess.classList.add("hidden");
 
             // 自动把用户最终认可并合成的所有片段作为【正样本】收集
             const posItems = state.events.filter(it => it.embedding).map(it => ({
@@ -660,7 +692,8 @@ window.addEventListener("DOMContentLoaded", () => {
                     body: JSON.stringify({
                         video_filename: state.uploadedFile.filename,
                         intervals: state.intervals,
-                        original_name: state.uploadedFile.original_name
+                        original_name: state.uploadedFile.original_name,
+                        export_dir: currentCustomExportDir
                     })
                 });
                 const data = await resp.json();
@@ -675,24 +708,27 @@ window.addEventListener("DOMContentLoaded", () => {
         });
     }
 
-    // 渲染完成
+    // 渲染完成：在合并按钮前面显示任务成功的说明，点击说明文字即可直接打开目录
     function onRenderComplete(result) {
         hideProgress();
         if (btnRenderVideo) btnRenderVideo.disabled = false;
 
-        // 提示已自动保存到 D:\videocliout，并显示快速打开文件夹按钮
         if (result && result.export_saved) {
-            if (saveLocationTag) {
-                saveLocationTag.innerText = `成片已成功合并并存入: D:\\videocliout\\${result.output_filename}`;
-                saveLocationTag.classList.remove("hidden");
-            }
-            if (btnOpenDir) {
-                btnOpenDir.classList.remove("hidden");
-                btnOpenDir.onclick = async () => {
+            const finalDir = result.export_dir || currentCustomExportDir;
+
+            // 激活“合并并保存”按钮前方的成功提示按钮
+            if (btnMergeSuccess) {
+                if (mergeSuccessText) {
+                    mergeSuccessText.innerText = `已成功保存至 ${finalDir} (点击打开)`;
+                }
+                btnMergeSuccess.classList.remove("hidden");
+                btnMergeSuccess.onclick = async () => {
                     try {
-                        await fetch("/api/open-folder", { method: "POST" });
+                        const form = new FormData();
+                        form.append("folder", finalDir);
+                        await fetch("/api/open-folder", { method: "POST", body: form });
                     } catch (e) {
-                        alert("无法自动呼出文件夹，请直接在资源管理器中打开 D:\\videocliout");
+                        alert(`无法直接唤起窗口，请在文件资源管理器中打开: ${finalDir}`);
                     }
                 };
             }
@@ -735,6 +771,7 @@ window.addEventListener("DOMContentLoaded", () => {
                 if (batchTrimPanel) batchTrimPanel.classList.add("hidden");
                 if (saveLocationTag) saveLocationTag.classList.add("hidden");
                 if (btnOpenDir) btnOpenDir.classList.add("hidden");
+                if (btnMergeSuccess) btnMergeSuccess.classList.add("hidden");
 
                 renderEventsList();
             } catch (err) {

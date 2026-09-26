@@ -271,21 +271,28 @@
                         <span id="badge-count" class="px-2 py-0.5 rounded-full text-[11px] bg-rose-500/15 text-rose-400 border border-rose-500/25 font-mono font-medium">0 个片段</span>
                     </div>
                     <div class="flex items-center gap-2">
-                        <button id="btn-open-dir" class="text-xs text-emerald-400 hover:text-emerald-300 bg-emerald-500/10 hover:bg-emerald-500/20 px-3 py-1.5 rounded-lg border border-emerald-500/25 font-medium hidden flex items-center gap-1.5 transition">
-                            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 19a2 2 0 01-2-2V7a2 2 0 012-2h4l2 2h4a2 2 0 012 2v1M5 19h14a2 2 0 002-2v-5a2 2 0 00-2-2H9a2 2 0 00-2 2v5a2 2 0 01-2 2z"/></svg>
-                            打开目录 (D:\videocliout)
+                        <!-- 合并成功提示说明 (点击直接在系统资源管理器中打开成片所在文件夹) -->
+                        <button id="btn-merge-success" class="text-xs text-emerald-300 hover:text-emerald-200 bg-emerald-500/15 hover:bg-emerald-500/25 px-2.5 py-1.5 rounded-lg border border-emerald-500/30 font-medium hidden flex items-center gap-1.5 transition cursor-pointer group shadow-sm" title="点击立即在电脑中打开保存文件夹">
+                            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                            <span id="merge-success-text" class="group-hover:underline">已成功保存至 D:\videocliout (点击打开)</span>
+                            <svg class="w-3.5 h-3.5 opacity-70 group-hover:opacity-100" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
                         </button>
-                        <button id="btn-render-video" disabled class="px-3.5 py-1.5 bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-500 hover:to-emerald-600 disabled:opacity-35 disabled:cursor-not-allowed text-xs font-semibold text-white rounded-lg shadow-sm shadow-emerald-900/30 transition-all flex items-center gap-1.5 border border-emerald-400/25">
+
+                        <!-- 合并并保存主按钮 -->
+                        <button id="btn-render-video" disabled class="px-3.5 py-1.5 bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-500 hover:to-emerald-600 disabled:opacity-35 disabled:cursor-not-allowed text-xs font-semibold text-white rounded-lg shadow-sm shadow-emerald-900/30 transition-all flex items-center gap-1.5 border border-emerald-400/25 shrink-0">
                             <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2"/></svg>
                             合并并保存
                         </button>
-                    </div>
-                </div>
 
-                <!-- 导出保存状态提示标签 -->
-                <div id="save-location-tag" class="hidden text-xs text-emerald-400/90 font-mono mb-2 px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center gap-1.5">
-                    <svg class="w-3.5 h-3.5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-                    <span>成片已成功合并并存入: D:\videocliout</span>
+                        <!-- 自定义保存路径按钮 -->
+                        <button id="btn-change-export-dir" class="px-2.5 py-1.5 bg-white/[0.04] hover:bg-white/[0.09] text-slate-300 hover:text-white rounded-lg border border-white/[0.08] hover:border-white/[0.2] text-xs font-medium transition flex items-center gap-1.5 shrink-0" title="手动选取合并后文件的保存文件夹 (当前默认: D:\videocliout)">
+                            <svg class="w-3.5 h-3.5 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/>
+                            </svg>
+                            <span id="label-export-dir" class="font-mono text-[11px] truncate max-w-[130px]" title="D:\videocliout">D:\videocliout</span>
+                            <span class="text-[10px] text-slate-400 hover:text-amber-300 underline">更改</span>
+                        </button>
+                    </div>
                 </div>
 
                 <!-- 极简片段卡片容器 (横向网格流动排列) -->
@@ -306,6 +313,6 @@
     </footer>
 
     <!-- 业务逻辑脚本 (加版本号避免浏览器304旧缓存) -->
-    <script src="/static/js/app.js?v=18.0"></script>
+    <script src="/static/js/app.js?v=19.0"></script>
 </body>
 </html>

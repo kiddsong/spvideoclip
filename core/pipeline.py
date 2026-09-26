@@ -190,6 +190,7 @@ class VideoPipeline:
         video_filename: str,
         intervals: list,
         original_name: Optional[str] = None,
+        custom_export_dir: Optional[str] = None,
         progress_cb: Optional[Callable[[float, str], None]] = None
     ) -> Dict[str, Any]:
         """第二阶段：根据区间列表截取并拼接生成统一的标准 H.264 MP4 成片"""
@@ -221,8 +222,11 @@ class VideoPipeline:
 
         output_info = self.audio_extractor.get_video_info(output_path)
 
-        # 自动复制/导出到目标目录 D:\videocliout
-        export_file_path = os.path.join(self.export_dir, output_filename)
+        # 确定最终导出目录（优先使用用户自定义路径，默认使用 D:\videocliout）
+        target_export_dir = custom_export_dir if custom_export_dir and os.path.isabs(custom_export_dir) else self.export_dir
+        os.makedirs(target_export_dir, exist_ok=True)
+
+        export_file_path = os.path.join(target_export_dir, output_filename)
         try:
             shutil.copy2(output_path, export_file_path)
             export_saved = True
@@ -230,13 +234,13 @@ class VideoPipeline:
             export_saved = False
             export_file_path = f"保存失败: {str(e)}"
 
-        if progress_cb: progress_cb(1.0, f"成片已生成并自动保存至 {self.export_dir}！")
+        if progress_cb: progress_cb(1.0, f"成片已生成并自动保存至 {target_export_dir}！")
 
         return {
             "output_filename": output_filename,
             "duration": output_info["duration"],
             "size_bytes": output_info["size_bytes"],
-            "export_dir": self.export_dir,
+            "export_dir": target_export_dir,
             "export_file_path": export_file_path,
             "export_saved": export_saved
         }

@@ -38,6 +38,7 @@ class RenderRequest(BaseModel):
     video_filename: str
     intervals: List[List[float]]
     original_name: Optional[str] = None
+    export_dir: Optional[str] = None
 
 class FeedbackItem(BaseModel):
     embedding: List[float]
@@ -165,6 +166,7 @@ async def render_video(
                 video_filename=req.video_filename,
                 intervals=intervals_tuple,
                 original_name=req.original_name,
+                custom_export_dir=req.export_dir,
                 progress_cb=on_progress
             )
             TASKS_STATUS[task_id]["status"] = "success"
@@ -187,15 +189,40 @@ async def get_task_status(task_id: str):
         raise HTTPException(status_code=404, detail="未找到该任务")
     return info
 
+@app.post("/api/select-export-dir")
+async def select_export_dir():
+    """唤起 Windows 系统的文件夹选择对话框，返回选定的目录绝对路径"""
+    def pick_dir():
+        import tkinter as tk
+        from tkinter import filedialog
+        root = tk.Tk()
+        root.withdraw()
+        root.attributes('-topmost', True)
+        folder_selected = filedialog.askdirectory(
+            title="选择合并成片保存的目标文件夹",
+            initialdir=pipeline.export_dir if os.path.exists(pipeline.export_dir) else "C:\\"
+        )
+        root.destroy()
+        return folder_selected
+
+    loop = asyncio.get_event_loop()
+    selected_folder = await loop.run_in_executor(None, pick_dir)
+
+    if not selected_folder:
+        return {"status": "cancelled", "message": "未更改保存目录"}
+
+    selected_folder = os.path.normpath(selected_folder)
+    return {"status": "success", "export_dir": selected_folder}
+
 @app.post("/api/open-folder")
-async def open_output_folder():
-    """在 Windows 资源管理器中打开导出目录"""
-    export_dir = pipeline.export_dir
-    if not os.path.exists(export_dir):
-        os.makedirs(export_dir, exist_ok=True)
+async def open_output_folder(folder: Optional[str] = Form(None)):
+    """在 Windows 资源管理器中打开指定目录（默认打开当前配置的导出目录）"""
+    target_dir = folder if folder and os.path.isabs(folder) else pipeline.export_dir
+    if not os.path.exists(target_dir):
+        os.makedirs(target_dir, exist_ok=True)
     try:
-        os.startfile(export_dir)
-        return {"status": "success", "path": export_dir}
+        os.startfile(target_dir)
+        return {"status": "success", "path": target_dir}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"打开文件夹失败: {str(e)}")
 
