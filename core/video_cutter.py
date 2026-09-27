@@ -39,13 +39,15 @@ class VideoCutter:
                 if progress_callback:
                     progress_callback(idx + 1, total, f"正在裁剪片段 {idx+1}/{total} [{start_sec}s - {end_sec}s]")
 
-                # 采用精确seek与重编码，保证拼接时时间基与音频一致
+                # 采用精确seek与重编码，强制 CFR 与音频时间戳异步重采样，保证拼接时音画毫秒级对齐
                 cmd = [
                     "ffmpeg",
                     "-y",
                     "-ss", str(start_sec),
                     "-t", str(duration),
                     "-i", input_video,
+                    "-fps_mode", "cfr",
+                    "-af", "aresample=async=1000:min_hard_comp=0.100000:first_pts=0",
                     "-c:v", "libx264",
                     "-preset", self.preset,
                     "-crf", str(self.crf),

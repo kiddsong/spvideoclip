@@ -179,6 +179,8 @@ class AudioExtractor:
             "-y",
             "-i", input_path,
             "-vf", scale_filter,
+            "-fps_mode", "cfr",
+            "-af", "aresample=async=1000:min_hard_comp=0.100000:first_pts=0",
             "-c:v", "libx264",
             "-preset", "ultrafast",
             "-tune", "fastdecode",
@@ -193,12 +195,14 @@ class AudioExtractor:
             temp_output
         ]
 
-        # 默认优先使用 CPU 超快 480p 转码（10x~15x 速率，绝对稳定兼容任何显卡环境）
+        # 默认优先使用 CPU 超快 480p 转码（带 CFR+aresample 同步锁，绝对稳定杜绝声画不同步）
         cmd = [
             "ffmpeg",
             "-y",
             "-i", input_path,
             "-vf", scale_filter,
+            "-fps_mode", "cfr",
+            "-af", "aresample=async=1000:min_hard_comp=0.100000:first_pts=0",
             "-c:v", "libx264",
             "-preset", "ultrafast",
             "-tune", "fastdecode",

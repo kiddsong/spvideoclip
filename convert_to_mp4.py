@@ -214,10 +214,15 @@ def transcode_video(
         ]
     else:
         # 2. 硬件加速或 CPU 高画质重编码
+        # 强制音视频双向锁相重同步，彻底解决 AVI/WMV 早期可变帧率(VFR)与音频漂移问题：
+        # -fps_mode cfr: 强制视频以恒定帧率(CFR)重采样，填补丢帧
+        # aresample=async=1000:first_pts=0: 动态微调音频采样对齐视频 PTS，确保音画永久同步
         cmd = [
             "ffmpeg", "-y",
             "-i", src_path
         ] + encoder_flags + [
+            "-fps_mode", "cfr",
+            "-af", "aresample=async=1000:min_hard_comp=0.100000:first_pts=0",
             "-c:a", "aac",
             "-b:a", "192k",
             "-ac", "2",
