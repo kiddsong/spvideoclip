@@ -239,6 +239,8 @@ spvideoclip/
 │
 ├── run.py                       # Python 启动脚本入口
 ├── start.bat                    # Windows 快速双击启动批处理
+├── convert_to_mp4.py            # 视频批量递归转码为标准 MP4 工具
+├── convert_to_mp4.bat           # 批量转码一键运行批处理
 ├── requirements.txt             # 项目依赖清单
 ├── LICENSE                      # 开源许可证 (MIT)
 └── README.md                    # 项目官方详细技术文档
