@@ -227,14 +227,16 @@ class TaskDatabase:
         return bool(self.data.get("last_scan_time") and self.data.get("tasks"))
 
     def get_pending_tasks(self) -> List[Tuple[str, Dict[str, Any]]]:
-        """获取所有待处理任务（包含未开始或失败的任务），自动过滤掉物理上已不存在的文件"""
+        """获取所有待处理任务（仅包含 PENDING 或 FAILED 的非兼容文件），原生兼容或已完成的文件绝对跳过"""
         pending = []
         tasks = self.data.get("tasks", {})
         dirty = False
 
         for file_path, item in list(tasks.items()):
-            # 若文件已经处理完成，跳过
-            if item.get("status") == "PROCESSED":
+            status = item.get("status")
+
+            # 原生已兼容(NATIVE_COMPATIBLE) 或 已经转码完成(PROCESSED) 的文件直接跳过，无需处理
+            if status in ["PROCESSED", "NATIVE_COMPATIBLE"]:
                 continue
 
             # 校验物理文件是否存在
@@ -537,7 +539,7 @@ def main():
         print("\n" + "-" * 75)
         print(f" [发现历史任务库]: {db_file_path}")
         print(f" 上次扫描时间: {last_time}")
-        print(f" 任务统计: 总计录入 {stats['total']} 个文件 | 已完成: {stats['processed']} 个 | 待处理: {len(pending_tasks)} 个")
+        print(f" 任务统计: 总计录入 {stats['total']} 个 | 原生兼容(跳过): {stats['compatible']} 个 | 已完成: {stats['processed']} 个 | 待处理: {len(pending_tasks)} 个")
         print("-" * 75)
 
         if pending_tasks:
