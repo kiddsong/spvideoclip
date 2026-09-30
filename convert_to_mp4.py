@@ -504,19 +504,7 @@ def main():
     print(" SPVideoClip 视频批量转码与格式统一工具 (v3.0 - 任务记忆库与增量断点版)")
     print("=" * 75)
 
-    # 1. 检查运行依赖
-    if not check_ffmpeg():
-        print("\n[错误] 未检测到 FFmpeg 或 FFprobe！")
-        print("本工具深度依赖 FFmpeg 硬件加速编解码。请安装并添加至环境变量 PATH。")
-        print("下载地址: https://www.gyan.dev/ffmpeg/builds/")
-        input("\n按回车键退出程序...")
-        sys.exit(1)
-
-    # 2. 自动检测 GPU 硬件加速器
-    enc_name, enc_flags, enc_desc = detect_hardware_encoder()
-    print(f" [硬件检测] 当前启用引擎: {enc_desc}")
-
-    # 3. 确定工作目录
+    # 1. 确定工作目录并第一时间检测历史任务库 (0毫秒瞬时响应)
     script_dir = os.path.dirname(os.path.abspath(__file__))
     target_dir = sys.argv[1] if len(sys.argv) > 1 else script_dir
 
@@ -524,20 +512,19 @@ def main():
         print(f"[错误] 指定的目标目录不存在: {target_dir}")
         sys.exit(1)
 
-    # 4. 初始化任务记录库
     db_file_path = os.path.join(target_dir, TASK_DB_FILENAME)
     task_db = TaskDatabase(db_file_path, target_dir)
 
     should_rescan = True
 
-    # 检查是否之前扫描过且存在未完成任务
+    # 第一时间展示历史任务库状态
     if task_db.has_history():
         stats = task_db.get_statistics()
         pending_tasks = task_db.get_pending_tasks()
         last_time = task_db.data.get("last_scan_time", "未知")
 
         print("\n" + "-" * 75)
-        print(f" [发现历史任务库]: {db_file_path}")
+        print(f" [第一时间检测到历史任务库]: {db_file_path}")
         print(f" 上次扫描时间: {last_time}")
         print(f" 任务统计: 总计录入 {stats['total']} 个 | 原生兼容(跳过): {stats['compatible']} 个 | 已完成: {stats['processed']} 个 | 待处理: {len(pending_tasks)} 个")
         print("-" * 75)
@@ -571,7 +558,18 @@ def main():
                 print("无需处理，程序退出。")
                 return
 
-    # 5. 执行全盘重新扫描 或 从任务库直接载入
+    # 2. 检查运行依赖与 GPU 硬件加速 (在用户选定继续后再启动硬件探测)
+    if not check_ffmpeg():
+        print("\n[错误] 未检测到 FFmpeg 或 FFprobe！")
+        print("本工具深度依赖 FFmpeg 硬件加速编解码。请安装并添加至环境变量 PATH。")
+        print("下载地址: https://www.gyan.dev/ffmpeg/builds/")
+        input("\n按回车键退出程序...")
+        sys.exit(1)
+
+    enc_name, enc_flags, enc_desc = detect_hardware_encoder()
+    print(f"\n [硬件检测] 当前启用引擎: {enc_desc}")
+
+    # 3. 执行全盘重新扫描 或 从任务库直接载入
     if should_rescan:
         need_transcode_list, compatible_list = scan_directory(target_dir)
         task_db.update_scan_results(need_transcode_list, compatible_list)
