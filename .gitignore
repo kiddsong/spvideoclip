@@ -41,3 +41,7 @@ storage/outputs/*
 *~
 .DS_Store
 Thumbs.db
+
+# 转码工具任务库与临时文件
+convert_task_db.json
+*.converting_temp.mp4
