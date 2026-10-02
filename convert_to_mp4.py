@@ -630,11 +630,36 @@ def main():
         parent_dir = os.path.dirname(src_path)
         dst_path = os.path.join(parent_dir, f"{base_name}.mp4")
 
+        # 【核心新增】：在正式转码前进行毫秒级自动二次核实 (Real-time Pre-execution Verification)
+        # 针对历史误标、已被其他方式处理过或已转为标准 MP4 的文件，自动修正数据库并无缝跳过！
+        live_info = probe_video(src_path)
+        if live_info and is_spvideoclip_native(src_path, live_info):
+            print(f"[{idx}/{total_count}] 跳过已合规文件: {filename}")
+            print(f"   [自动核验] 检测到该文件已经是标准 H.264+AAC MP4 格式，无需重复转码！")
+            task_db.mark_processed(src_path, src_path)
+            continue
+
+        # 如果源文件并非原生，但同一目录下已存在同名 .mp4，再次核查目标 mp4 是否已完好转码就绪
+        if os.path.exists(dst_path) and os.path.abspath(src_path) != os.path.abspath(dst_path):
+            dst_info = probe_video(dst_path)
+            if dst_info and is_spvideoclip_native(dst_path, dst_info):
+                print(f"[{idx}/{total_count}] 自动跳过并清理旧文件: {filename}")
+                print(f"   [自动核验] 检测到目标 {base_name}.mp4 已成功就绪且编码合规，直接补全标记并移除残留原文件！")
+                try:
+                    os.remove(src_path)
+                except Exception:
+                    pass
+                task_db.mark_processed(src_path, dst_path)
+                continue
+
+        # 使用最新实时探测到的元数据替换可能过时的历史元数据
+        current_info = live_info if live_info else info
+
         print(f"[{idx}/{total_count}] 正在处理: {filename}")
         print(f"   路径: {src_path}")
-        print(f"   大小: {format_size(info.get('size_bytes', 0))} | 时长: {format_duration(info.get('duration', 0.0))}")
+        print(f"   大小: {format_size(current_info.get('size_bytes', 0))} | 时长: {format_duration(current_info.get('duration', 0.0))}")
 
-        success = transcode_video(src_path, dst_path, info, enc_name, enc_flags)
+        success = transcode_video(src_path, dst_path, current_info, enc_name, enc_flags)
         if success:
             success_count += 1
             task_db.mark_processed(src_path, dst_path)
