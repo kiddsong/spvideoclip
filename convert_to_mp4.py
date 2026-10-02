@@ -30,6 +30,7 @@ import shutil
 import subprocess
 import time
 import tempfile
+import threading
 from typing import Dict, Any, Optional, Tuple, List
 
 # 常见视频扩展名列表
@@ -77,8 +78,8 @@ def is_network_or_nas_path(file_path: str) -> bool:
             pass
     return False
 
-def copy_file_with_progress(src_file: str, dst_file: str, total_bytes: int):
-    """带实时传输速率与进度的流式高速回写（吃满千兆网络 80~110 MB/s 连续写入能力）"""
+def copy_file_with_progress(src_file: str, dst_file: str, total_bytes: int, label: str = "速率"):
+    """带实时传输速率与进度的流式高速顺序复制（4MB 大块缓冲，吃满千兆网络 80~110 MB/s 连续读写）"""
     chunk_size = 1024 * 1024 * 4 # 4MB 大块缓冲，极大减少 SMB 网络往返延迟
     copied = 0
     start_time = time.time()
@@ -102,6 +103,115 @@ def copy_file_with_progress(src_file: str, dst_file: str, total_bytes: int):
 
     sys.stdout.write("\n")
     sys.stdout.flush()
+
+class AsyncPrefetcher:
+    """
+    异步预拉取流水线（双缓冲 Pipeline）：
+    在当前视频进行 GPU 本地转码的同时，由后台独立线程以 4MB 大块顺序预拉取下一个视频到本地 SSD Temp 目录。
+    优点：
+    1. 彻底消除 NAS 机械硬盘的高频随机寻道，以 80~110 MB/s 纯顺序读（跑满千兆网）一次性拉完即休眠；
+    2. 下一个视频已在本地就绪，当前转码完成瞬间即可开工，零等待！
+    """
+    def __init__(self):
+        self.lock = threading.Lock()
+        self.thread: Optional[threading.Thread] = None
+        self.target_src_path: Optional[str] = None
+        self.local_temp_path: Optional[str] = None
+        self.status: str = "IDLE" # IDLE, FETCHING, READY, FAILED
+        self.error_msg: str = ""
+
+    def prefetch(self, src_path: str):
+        with self.lock:
+            if not is_network_or_nas_path(src_path):
+                return
+            # 如果已经在拉取同一个文件，不重复拉取
+            if self.target_src_path == src_path and self.status in ["FETCHING", "READY"]:
+                return
+            self._cleanup_local()
+            self.target_src_path = src_path
+            self.status = "FETCHING"
+            self.error_msg = ""
+
+        def worker():
+            try:
+                ext = os.path.splitext(src_path)[1]
+                local_fd, local_path = tempfile.mkstemp(prefix="spvideo_src_", suffix=ext)
+                os.close(local_fd)
+                total_size = os.path.getsize(src_path)
+
+                chunk_size = 1024 * 1024 * 4
+                with open(src_path, "rb") as fsrc, open(local_path, "wb") as fdst:
+                    while True:
+                        buf = fsrc.read(chunk_size)
+                        if not buf:
+                            break
+                        fdst.write(buf)
+
+                with self.lock:
+                    self.local_temp_path = local_path
+                    self.status = "READY"
+            except Exception as e:
+                with self.lock:
+                    self.status = "FAILED"
+                    self.error_msg = str(e)
+                    self._cleanup_local()
+
+        self.thread = threading.Thread(target=worker, daemon=True)
+        self.thread.start()
+
+    def get_local_source(self, src_path: str) -> Optional[str]:
+        """获取已预拉取到本地的源文件路径，若仍在拉取则等待完成"""
+        if not is_network_or_nas_path(src_path):
+            return None
+
+        # 检查是否匹配当前预拉取目标
+        with self.lock:
+            need_wait = (self.target_src_path == src_path)
+
+        if need_wait:
+            if self.thread and self.thread.is_alive():
+                print("   [流水线优化] 等待后台顺序大块拉取完成 (纯顺序读取保护 NAS 机械盘)...")
+                self.thread.join()
+            with self.lock:
+                if self.status == "READY" and self.local_temp_path and os.path.exists(self.local_temp_path):
+                    return self.local_temp_path
+
+        # 若未预拉取成功，则现场以大块顺序流式拉取（带实时千兆测速进度条）
+        print("   [顺序拉取] 正在以 4MB 大块纯顺序流拉取到本地高速 SSD...")
+        ext = os.path.splitext(src_path)[1]
+        local_fd, local_path = tempfile.mkstemp(prefix="spvideo_src_", suffix=ext)
+        os.close(local_fd)
+        try:
+            total_size = os.path.getsize(src_path)
+            copy_file_with_progress(src_path, local_path, total_size)
+            with self.lock:
+                self.target_src_path = src_path
+                self.local_temp_path = local_path
+                self.status = "READY"
+            return local_path
+        except Exception as e:
+            if os.path.exists(local_path):
+                try:
+                    os.remove(local_path)
+                except Exception:
+                    pass
+            print(f"   [提示] 本地预拉取降级，回退直接流式处理: {e}")
+            return None
+
+    def release_current(self):
+        """释放并删除当前本地临时源视频文件"""
+        with self.lock:
+            self._cleanup_local()
+            self.target_src_path = None
+            self.status = "IDLE"
+
+    def _cleanup_local(self):
+        if self.local_temp_path and os.path.exists(self.local_temp_path):
+            try:
+                os.remove(self.local_temp_path)
+            except Exception:
+                pass
+        self.local_temp_path = None
 
 def check_ffmpeg() -> bool:
     """检查系统环境是否有 ffmpeg 和 ffprobe"""
@@ -394,11 +504,20 @@ def transcode_video(
     dst_path: str,
     info: Dict[str, Any],
     encoder_name: str,
-    encoder_flags: List[str]
+    encoder_flags: List[str],
+    prefetcher: Optional[AsyncPrefetcher] = None
 ) -> bool:
-    """执行单个视频的高性能转码（智能支持 NAS/网络盘本地高速中转，彻底消除末尾卡死）"""
-    # 判断目标路径是否位于网络挂载盘或 NAS
+    """执行单个视频的高性能转码（智能支持 NAS 顺序预拉取流水线 + 本地 SSD 高速中转，彻底消除末尾卡死并保护 NAS 机械盘）"""
     is_remote = is_network_or_nas_path(dst_path)
+
+    # 1. 如果源文件在 NAS 上，优先从预取器中获取已在本地 SSD 上的源文件副本
+    actual_input_path = src_path
+    local_source_used = False
+    if is_remote and prefetcher:
+        local_src = prefetcher.get_local_source(src_path)
+        if local_src and os.path.exists(local_src):
+            actual_input_path = local_src
+            local_source_used = True
 
     if is_remote:
         # 在本地系统的高速临时目录（如 SSD 上的 Temp）创建中间临时输出文件
@@ -422,12 +541,12 @@ def transcode_video(
 
     total_duration = info.get("duration", 0.0)
 
-    # 1. 优先尝试极速流拷贝 (0.2 秒完成)
+    # 2. 优先尝试极速流拷贝 (0.2 秒完成)
     if can_stream_copy(info):
         print("   [模式] 检测到视频流已为 H.264 编码 -> 启用【极速无损封装换流】...")
         cmd = [
             "ffmpeg", "-y",
-            "-i", src_path,
+            "-i", actual_input_path,
             "-c:v", "copy",
             "-c:a", "aac",
             "-b:a", "192k",
@@ -437,10 +556,10 @@ def transcode_video(
             temp_dst
         ]
     else:
-        # 2. 硬件加速或 CPU 高画质重编码 (附带 CFR 与音频时间戳校准，杜绝音画不同步)
+        # 3. 硬件加速或 CPU 高画质重编码 (附带 CFR 与音频时间戳校准，杜绝音画不同步)
         cmd = [
             "ffmpeg", "-y",
-            "-i", src_path
+            "-i", actual_input_path
         ] + encoder_flags + [
             "-fps_mode", "cfr",
             "-af", "aresample=async=1000:min_hard_comp=0.100000:first_pts=0",
@@ -496,6 +615,10 @@ def transcode_video(
 
         cost_time = time.time() - start_time
 
+        # 释放本地拉取的临时源视频（腾出本地 SSD 空间）
+        if local_source_used and prefetcher:
+            prefetcher.release_current()
+
         if proc.returncode == 0 and os.path.exists(temp_dst) and os.path.getsize(temp_dst) > 1024:
             src_abs = os.path.abspath(src_path)
             dst_abs = os.path.abspath(dst_path)
@@ -503,7 +626,7 @@ def transcode_video(
 
             if is_remote:
                 # 若目标在网络映射盘/NAS，采用 4MB 连续大块高吞吐回写（吃满千兆网络 80~110 MB/s）
-                print(f"   [回写 NAS] 正在高速传回目标目录 ({format_size(temp_size)})...")
+                print(f"   [回写 NAS] 正在高速顺序传回目标目录 ({format_size(temp_size)})...")
                 remote_temp_dst = dst_abs + ".converting_temp.mp4"
                 if os.path.exists(remote_temp_dst):
                     try:
@@ -703,61 +826,78 @@ def main():
         print("已取消转码任务。")
         return
 
-    # 7. 开始批量流水线
+    # 7. 启动双缓冲预拉取流水线 (保护 NAS 机械盘，实现千兆 80~110 MB/s 满速吞吐)
     print("\n" + "=" * 75)
-    print(" 开始批量转码与增量更新...")
+    print(" 开始批量转码与增量更新 (已激活 NAS 顺序预拉取与双缓冲流水线)...")
     print("=" * 75)
 
+    prefetcher = AsyncPrefetcher()
     success_count = 0
     fail_count = 0
     total_count = len(pending_tasks)
     all_start_time = time.time()
 
-    for idx, (src_path, info) in enumerate(pending_tasks, 1):
-        if not os.path.exists(src_path):
-            continue
+    # 预拉取第 1 个任务（若是远程路径）
+    if total_count > 0:
+        first_src = pending_tasks[0][0]
+        if is_network_or_nas_path(first_src):
+            prefetcher.prefetch(first_src)
 
-        filename = os.path.basename(src_path)
-        base_name, _ = os.path.splitext(filename)
-        parent_dir = os.path.dirname(src_path)
-        dst_path = os.path.join(parent_dir, f"{base_name}.mp4")
-
-        # 【核心新增】：在正式转码前进行毫秒级自动二次核实 (Real-time Pre-execution Verification)
-        # 针对历史误标、已被其他方式处理过或已转为标准 MP4 的文件，自动修正数据库并无缝跳过！
-        live_info = probe_video(src_path)
-        if live_info and is_spvideoclip_native(src_path, live_info):
-            print(f"[{idx}/{total_count}] 跳过已合规文件: {filename}")
-            print(f"   [自动核验] 检测到该文件已经是标准 H.264+AAC MP4 格式，无需重复转码！")
-            task_db.mark_processed(src_path, src_path)
-            continue
-
-        # 如果源文件并非原生，但同一目录下已存在同名 .mp4，再次核查目标 mp4 是否已完好转码就绪
-        if os.path.exists(dst_path) and os.path.abspath(src_path) != os.path.abspath(dst_path):
-            dst_info = probe_video(dst_path)
-            if dst_info and is_spvideoclip_native(dst_path, dst_info):
-                print(f"[{idx}/{total_count}] 自动跳过并清理旧文件: {filename}")
-                print(f"   [自动核验] 检测到目标 {base_name}.mp4 已成功就绪且编码合规，直接补全标记并移除残留原文件！")
-                try:
-                    os.remove(src_path)
-                except Exception:
-                    pass
-                task_db.mark_processed(src_path, dst_path)
+    try:
+        for idx, (src_path, info) in enumerate(pending_tasks, 1):
+            if not os.path.exists(src_path):
                 continue
 
-        # 使用最新实时探测到的元数据替换可能过时的历史元数据
-        current_info = live_info if live_info else info
+            # 提前在后台异步触发拉取【下一个任务】(当前 GPU 正在转码时，后台同时拉取下一个，无缝咬合)
+            if idx < total_count:
+                next_src = pending_tasks[idx][0]
+                if is_network_or_nas_path(next_src):
+                    prefetcher.prefetch(next_src)
 
-        print(f"[{idx}/{total_count}] 正在处理: {filename}")
-        print(f"   路径: {src_path}")
-        print(f"   大小: {format_size(current_info.get('size_bytes', 0))} | 时长: {format_duration(current_info.get('duration', 0.0))}")
+            filename = os.path.basename(src_path)
+            base_name, _ = os.path.splitext(filename)
+            parent_dir = os.path.dirname(src_path)
+            dst_path = os.path.join(parent_dir, f"{base_name}.mp4")
 
-        success = transcode_video(src_path, dst_path, current_info, enc_name, enc_flags)
-        if success:
-            success_count += 1
-            task_db.mark_processed(src_path, dst_path)
-        else:
-            fail_count += 1
-            task_db.mark_failed(src_path, "转码失败")
+            # 【核心功能】：在正式转码前进行毫秒级自动二次核实 (Real-time Pre-execution Verification)
+            # 针对历史误标、已被其他方式处理过或已转为标准 MP4 的文件，自动修正数据库并无缝跳过！
+            live_info = probe_video(src_path)
+            if live_info and is_spvideoclip_native(src_path, live_info):
+                print(f"[{idx}/{total_count}] 跳过已合规文件: {filename}")
+                print(f"   [自动核验] 检测到该文件已经是标准 H.264+AAC MP4 格式，无需重复转码！")
+                task_db.mark_processed(src_path, src_path)
+                continue
+
+            # 如果源文件并非原生，但同一目录下已存在同名 .mp4，再次核查目标 mp4 是否已完好转码就绪
+            if os.path.exists(dst_path) and os.path.abspath(src_path) != os.path.abspath(dst_path):
+                dst_info = probe_video(dst_path)
+                if dst_info and is_spvideoclip_native(dst_path, dst_info):
+                    print(f"[{idx}/{total_count}] 自动跳过并清理旧文件: {filename}")
+                    print(f"   [自动核验] 检测到目标 {base_name}.mp4 已成功就绪且编码合规，直接补全标记并移除残留原文件！")
+                    try:
+                        os.remove(src_path)
+                    except Exception:
+                        pass
+                    task_db.mark_processed(src_path, dst_path)
+                    continue
+
+            # 使用最新实时探测到的元数据替换可能过时的历史元数据
+            current_info = live_info if live_info else info
+
+            print(f"[{idx}/{total_count}] 正在处理: {filename}")
+            print(f"   路径: {src_path}")
+            print(f"   大小: {format_size(current_info.get('size_bytes', 0))} | 时长: {format_duration(current_info.get('duration', 0.0))}")
+
+            success = transcode_video(src_path, dst_path, current_info, enc_name, enc_flags, prefetcher)
+            if success:
+                success_count += 1
+                task_db.mark_processed(src_path, dst_path)
+            else:
+                fail_count += 1
+                task_db.mark_failed(src_path, "转码失败")
+
+    finally:
+        prefetcher.release_current()
 
     total_cost = time.time() - all_start_time
     print("=" * 75)
