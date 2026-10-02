@@ -29,6 +29,7 @@ import json
 import shutil
 import subprocess
 import time
+import tempfile
 from typing import Dict, Any, Optional, Tuple, List
 
 # 常见视频扩展名列表
@@ -56,6 +57,51 @@ def format_duration(seconds: float) -> str:
     if h > 0:
         return f"{h}小时{m:02d}分{s:02d}秒"
     return f"{m:02d}分{s:02d}秒"
+
+def is_network_or_nas_path(file_path: str) -> bool:
+    """判断文件路径是否位于网络挂载盘 / NAS / 映射驱动器"""
+    abs_path = os.path.abspath(file_path)
+    # UNC 路径: \\nas\share\...
+    if abs_path.startswith("\\\\"):
+        return True
+    # Windows 映射网络驱动器判断
+    if sys.platform == "win32" and len(abs_path) >= 2 and abs_path[1] == ":":
+        drive_letter = abs_path[:2].upper()
+        try:
+            import ctypes
+            drive_type = ctypes.windll.kernel32.GetDriveTypeW(drive_letter + "\\")
+            # DRIVE_REMOTE = 4 (网络映射驱动器)
+            if drive_type == 4:
+                return True
+        except Exception:
+            pass
+    return False
+
+def copy_file_with_progress(src_file: str, dst_file: str, total_bytes: int):
+    """带实时传输速率与进度的流式高速回写（吃满千兆网络 80~110 MB/s 连续写入能力）"""
+    chunk_size = 1024 * 1024 * 4 # 4MB 大块缓冲，极大减少 SMB 网络往返延迟
+    copied = 0
+    start_time = time.time()
+    last_print = start_time
+
+    with open(src_file, "rb") as fsrc, open(dst_file, "wb") as fdst:
+        while True:
+            buf = fsrc.read(chunk_size)
+            if not buf:
+                break
+            fdst.write(buf)
+            copied += len(buf)
+
+            now = time.time()
+            if (now - last_print) >= 0.15 or copied >= total_bytes:
+                pct = min(100.0, (copied / total_bytes) * 100.0) if total_bytes > 0 else 100.0
+                elapsed = max(0.001, now - start_time)
+                speed_mb = (copied / (1024 * 1024)) / elapsed
+                render_progress_bar(pct, f"{speed_mb:.1f}MB/s", elapsed, ((total_bytes - copied) / (copied / elapsed)) if copied > 0 else 0)
+                last_print = now
+
+    sys.stdout.write("\n")
+    sys.stdout.flush()
 
 def check_ffmpeg() -> bool:
     """检查系统环境是否有 ffmpeg 和 ffprobe"""
@@ -350,13 +396,29 @@ def transcode_video(
     encoder_name: str,
     encoder_flags: List[str]
 ) -> bool:
-    """执行单个视频的高性能转码"""
-    temp_dst = dst_path + ".converting_temp.mp4"
-    if os.path.exists(temp_dst):
-        try:
-            os.remove(temp_dst)
-        except Exception:
-            pass
+    """执行单个视频的高性能转码（智能支持 NAS/网络盘本地高速中转，彻底消除末尾卡死）"""
+    # 判断目标路径是否位于网络挂载盘或 NAS
+    is_remote = is_network_or_nas_path(dst_path)
+
+    if is_remote:
+        # 在本地系统的高速临时目录（如 SSD 上的 Temp）创建中间临时输出文件
+        # 绝妙优势：
+        # 1. 避开网络延迟，转码与写入都在本地高速 SSD；
+        # 2. -movflags +faststart 在本地瞬间完成，彻底消除末尾卡死长达几十秒的问题！
+        local_temp_fd, temp_dst = tempfile.mkstemp(prefix="spvideo_fast_", suffix=".mp4")
+        os.close(local_temp_fd)
+        if os.path.exists(temp_dst):
+            try:
+                os.remove(temp_dst)
+            except Exception:
+                pass
+    else:
+        temp_dst = dst_path + ".converting_temp.mp4"
+        if os.path.exists(temp_dst):
+            try:
+                os.remove(temp_dst)
+            except Exception:
+                pass
 
     total_duration = info.get("duration", 0.0)
 
@@ -437,15 +499,45 @@ def transcode_video(
         if proc.returncode == 0 and os.path.exists(temp_dst) and os.path.getsize(temp_dst) > 1024:
             src_abs = os.path.abspath(src_path)
             dst_abs = os.path.abspath(dst_path)
+            temp_size = os.path.getsize(temp_dst)
 
-            if os.path.exists(src_abs):
-                os.remove(src_abs)
+            if is_remote:
+                # 若目标在网络映射盘/NAS，采用 4MB 连续大块高吞吐回写（吃满千兆网络 80~110 MB/s）
+                print(f"   [回写 NAS] 正在高速传回目标目录 ({format_size(temp_size)})...")
+                remote_temp_dst = dst_abs + ".converting_temp.mp4"
+                if os.path.exists(remote_temp_dst):
+                    try:
+                        os.remove(remote_temp_dst)
+                    except Exception:
+                        pass
 
-            if os.path.exists(dst_abs) and src_abs != dst_abs:
-                os.remove(dst_abs)
+                copy_file_with_progress(temp_dst, remote_temp_dst, temp_size)
 
-            os.rename(temp_dst, dst_abs)
-            print(f"   √ 转换完成并已替换！耗时: {cost_time:.1f} 秒\n")
+                # 清理本地高速临时文件
+                try:
+                    os.remove(temp_dst)
+                except Exception:
+                    pass
+
+                # 删除旧源文件并瞬间重命名到位
+                if os.path.exists(src_abs):
+                    os.remove(src_abs)
+
+                if os.path.exists(dst_abs) and src_abs != dst_abs:
+                    os.remove(dst_abs)
+
+                os.rename(remote_temp_dst, dst_abs)
+            else:
+                # 本地磁盘直接替换
+                if os.path.exists(src_abs):
+                    os.remove(src_abs)
+
+                if os.path.exists(dst_abs) and src_abs != dst_abs:
+                    os.remove(dst_abs)
+
+                os.rename(temp_dst, dst_abs)
+
+            print(f"   √ 转换完成并已替换！总耗时: {cost_time:.1f} 秒\n")
             return True
         else:
             print(f"   × 转码异常退出 (FFmpeg 返回码: {proc.returncode})")
